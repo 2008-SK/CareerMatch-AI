@@ -955,9 +955,59 @@ if st.button(
                 )
 
 
-                # =================================================
-                # FULL JOB DETAILS
-                # =================================================
+                # =========================================================
+# FULL JOB DETAILS
+# =========================================================
 
-                with st.expander(
-                    f"📄 Vi
+with st.expander(
+    f"📄 View Full Details - Job {number}"
+):
+
+    st.markdown("### 📝 Job Description")
+
+    st.write(
+        row["job_description"]
+    )
+
+    st.markdown("### 🛠️ Required Skills")
+
+    st.write(
+        row["job_skill_set"]
+    )
+
+    st.markdown("### 🎯 Matching Information")
+
+    st.write(
+        f"**Overall Match:** {match_percentage}%"
+    )
+
+    st.write(
+        f"**Skill Match:** {skill_percentage}%"
+    )
+
+    st.write(
+        f"**Your Matching Skills:** {matched_skills_text}"
+    )
+
+
+# =========================================================
+# FOOTER
+# =========================================================
+
+st.markdown("---")
+
+st.markdown("""
+<div class="footer">
+
+<b>💼 CareerMatch AI</b>
+
+<br>
+
+Smart Job Recommendation System
+
+<br><br>
+
+Built with Python • Pandas • Scikit-learn • Streamlit
+
+</div>
+""", unsafe_allow_html=True)
