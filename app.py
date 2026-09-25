@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import re
@@ -649,8 +650,6 @@ def extract_required_skills(skill_text):
 
     # -------------------------------------------------
     # Dataset list format
-    # Example:
-    # ['Python', 'SQL', 'Pandas']
     # -------------------------------------------------
 
     try:
@@ -782,7 +781,7 @@ entered_skill_list = extract_user_skills(
 if user_skills.strip():
 
     if len(
-        user_skills.split(",")
+        entered_skill_list
     ) > 8:
 
         st.warning(
@@ -909,7 +908,7 @@ def get_recommendations(
 ):
 
     # -------------------------------------------------
-    # 1. FILTER CATEGORY
+    # 1. FILTER SELECTED CATEGORY
     # -------------------------------------------------
 
     category_data = df[
@@ -942,7 +941,7 @@ def get_recommendations(
 
 
     # -------------------------------------------------
-    # 3. FIND ALL SKILLS AVAILABLE FOR SELECTED
+    # 3. FIND SKILLS AVAILABLE FOR SELECTED
     #    CATEGORY + POSITION
     # -------------------------------------------------
 
@@ -974,9 +973,14 @@ def get_recommendations(
         )
 
 
+    if not position_skill_pool:
+
+        return category_data.iloc[0:0]
+
+
     # -------------------------------------------------
-    # 4. FIND USER SKILLS RELEVANT TO SELECTED
-    #    POSITION
+    # 4. KEEP ONLY USER SKILLS RELEVANT TO
+    #    SELECTED POSITION
     # -------------------------------------------------
 
     relevant_user_skills = (
@@ -987,7 +991,6 @@ def get_recommendations(
     )
 
 
-    # If none of the entered skills are relevant
     if not relevant_user_skills:
 
         return category_data.iloc[0:0]
@@ -1005,7 +1008,7 @@ def get_recommendations(
 
 
     # -------------------------------------------------
-    # 5. CALCULATE SCORE FOR EVERY JOB
+    # 5. CALCULATE JOB SCORES
     # -------------------------------------------------
 
     results = []
@@ -1024,7 +1027,7 @@ def get_recommendations(
 
 
         # -------------------------------------------------
-        # MATCHED SKILLS
+        # MATCHING SKILLS
         # -------------------------------------------------
 
         matched_skills = (
@@ -1040,7 +1043,6 @@ def get_recommendations(
         )
 
 
-        # No matched skill = not recommended
         if matched_count == 0:
 
             continue
@@ -1050,10 +1052,7 @@ def get_recommendations(
         # USER SKILL COVERAGE
         #
         # Example:
-        # User has 4 relevant skills
-        # 3 are matched
-        #
-        # 3 / 4 × 100 = 75%
+        # 3 matched out of 4 user skills = 75%
         # -------------------------------------------------
 
         user_skill_coverage = (
@@ -1067,10 +1066,7 @@ def get_recommendations(
         # JOB REQUIREMENT COVERAGE
         #
         # Example:
-        # Job requires 6 skills
-        # User matches 3
-        #
-        # 3 / 6 × 100 = 50%
+        # 3 matched out of 6 required = 50%
         # -------------------------------------------------
 
         job_requirement_coverage = (
@@ -1081,13 +1077,13 @@ def get_recommendations(
 
 
         # -------------------------------------------------
-        # FINAL SKILL SCORE
+        # NORMAL SCORE FOR 2+ SKILLS
         #
-        # User skill coverage = 70%
-        # Job requirement coverage = 30%
+        # User Skill Coverage = 70%
+        # Job Requirement Coverage = 30%
         # -------------------------------------------------
 
-        final_score = (
+        normal_score = (
             user_skill_coverage * 0.70
             +
             job_requirement_coverage * 0.30
@@ -1095,22 +1091,36 @@ def get_recommendations(
 
 
         # -------------------------------------------------
-        # MAXIMUM DISPLAY SCORE = 95%
+        # SPECIAL RULE FOR LESS THAN 2 SKILLS
+        #
+        # If user provides only 1 skill,
+        # recommendation MUST remain below 30%.
+        #
+        # This prevents one skill from producing
+        # an unrealistically high recommendation.
         # -------------------------------------------------
 
-        final_score = min(
-            final_score,
-            95
-        )
+        if len(user_skill_list) < 2:
+
+            final_score = min(
+                normal_score,
+                29.9
+            )
+
+        else:
+
+            # Maximum recommendation = 95%
+            final_score = min(
+                normal_score,
+                95
+            )
 
 
         # -------------------------------------------------
-        # POSITION PRIORITY
+        # EXACT POSITION PRIORITY
         #
-        # Exact selected position gets priority
-        # only for sorting.
-        #
-        # It does NOT increase percentage.
+        # Used only for sorting.
+        # Does NOT increase percentage.
         # -------------------------------------------------
 
         position_priority = (
@@ -1165,7 +1175,7 @@ def get_recommendations(
 
 
     # -------------------------------------------------
-    # 7. CREATE RESULT DATAFRAME
+    # 7. RESULT DATAFRAME
     # -------------------------------------------------
 
     result_df = pd.DataFrame(
@@ -1174,7 +1184,7 @@ def get_recommendations(
 
 
     # -------------------------------------------------
-    # 8. MERGE RESULTS WITH ORIGINAL JOB DATA
+    # 8. MERGE WITH ORIGINAL DATA
     # -------------------------------------------------
 
     recommendations = category_data.merge(
@@ -1185,11 +1195,7 @@ def get_recommendations(
 
 
     # -------------------------------------------------
-    # 9. SORT
-    #
-    # Highest percentage first
-    # More matched skills second
-    # Exact selected position third
+    # 9. SORT BEST MATCHES
     # -------------------------------------------------
 
     recommendations = (
@@ -1239,7 +1245,7 @@ if st.button(
 ):
 
     # -------------------------------------------------
-    # CHECK USER SKILLS
+    # CHECK SKILLS
     # -------------------------------------------------
 
     if not user_skills.strip():
@@ -1293,8 +1299,7 @@ if st.button(
             st.caption(
                 "The percentage represents the skill "
                 "match between your skills and the "
-                "job requirements. Maximum displayed "
-                "score is 95%."
+                "job requirements."
             )
 
 
