@@ -4,116 +4,72 @@ import sqlite3
 import re
 import ast
 
-# =========================================================
-# DATABASE
-# =========================================================
-
-conn = sqlite3.connect("users.db", check_same_thread=False)
-cursor = conn.cursor()
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
-)
-""")
-
-conn.commit()
+import streamlit as st
+import json
+import os
+import hashlib
 
 
-# =========================================================
-# PASSWORD HASHING
-# =========================================================
+# =====================================================
+# USER DATA FILE
+# =====================================================
+
+USER_FILE = "user_data.json"
+
+
+def load_user():
+    if os.path.exists(USER_FILE):
+        with open(USER_FILE, "r") as file:
+            return json.load(file)
+    return None
+
+
+def save_user(user):
+    with open(USER_FILE, "w") as file:
+        json.dump(user, file)
+
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-# =========================================================
+# =====================================================
 # SESSION STATE
-# =========================================================
+# =====================================================
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-if "username" not in st.session_state:
-    st.session_state.username = ""
+if "page" not in st.session_state:
+    st.session_state.page = "Login"
 
 
-# =========================================================
-# LOGIN / REGISTER / FORGOT PASSWORD
-# =========================================================
+# =====================================================
+# LOGIN SYSTEM
+# =====================================================
 
 if not st.session_state.logged_in:
 
     st.title("🔐 CareerMatch AI")
 
     option = st.radio(
-        "Select Option",
-        ["Login", "Create Account", "Forgot Password"],
+        "Choose an option",
+        ["Login", "Register", "Forgot Password"],
         horizontal=True
     )
 
+    # =================================================
+    # REGISTER
+    # =================================================
 
-    # =====================================================
-    # LOGIN
-    # =====================================================
+    if option == "Register":
 
-    if option == "Login":
+        st.subheader("Create Account")
 
-        st.subheader("Login")
-
+        email = st.text_input("Email")
         username = st.text_input("Username")
         password = st.text_input(
             "Password",
-            type="password"
-        )
-
-        if st.button("Login", use_container_width=True):
-
-            if username == "" or password == "":
-                st.warning("Please enter username and password.")
-
-            else:
-                hashed_password = hash_password(password)
-
-                cursor.execute(
-                    """
-                    SELECT * FROM users
-                    WHERE username = ? AND password = ?
-                    """,
-                    (username, hashed_password)
-                )
-
-                user = cursor.fetchone()
-
-                if user:
-                    st.session_state.logged_in = True
-                    st.session_state.username = username
-
-                    st.success("Login successful!")
-                    st.rerun()
-
-                else:
-                    st.error("Invalid username or password.")
-
-
-    # =====================================================
-    # CREATE ACCOUNT
-    # =====================================================
-
-    elif option == "Create Account":
-
-        st.subheader("Create New Account")
-
-        name = st.text_input("Full Name")
-        email = st.text_input("Email")
-        username = st.text_input("Create Username")
-        password = st.text_input(
-            "Create Password",
             type="password"
         )
         confirm_password = st.text_input(
@@ -123,70 +79,94 @@ if not st.session_state.logged_in:
 
         if st.button("Register", use_container_width=True):
 
-            if not name or not email or not username or not password:
+            if not email or not username or not password:
                 st.warning("Please fill all fields.")
-
-            elif not re.match(
-                r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$",
-                email
-            ):
-                st.error("Please enter a valid email address.")
-
-            elif len(password) < 6:
-                st.error("Password must contain at least 6 characters.")
 
             elif password != confirm_password:
                 st.error("Passwords do not match.")
 
+            elif len(password) < 6:
+                st.error("Password must contain at least 6 characters.")
+
             else:
 
-                try:
-                    hashed_password = hash_password(password)
+                user = {
+                    "email": email,
+                    "username": username,
+                    "password": hash_password(password)
+                }
 
-                    cursor.execute(
-                        """
-                        INSERT INTO users
-                        (name, email, username, password)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (
-                            name,
-                            email,
-                            username,
-                            hashed_password
-                        )
-                    )
+                save_user(user)
 
-                    conn.commit()
-
-                    st.success(
-                        "Account created successfully! "
-                        "You can now login."
-                    )
-
-                except sqlite3.IntegrityError:
-
-                    st.error(
-                        "Username or email already exists."
-                    )
+                st.success(
+                    "Registration successful! "
+                    "You can now login."
+                )
 
 
-    # =====================================================
+    # =================================================
+    # LOGIN
+    # =================================================
+
+    elif option == "Login":
+
+        st.subheader("Login")
+
+        login_id = st.text_input(
+            "Email or Username"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+        if st.button("Login", use_container_width=True):
+
+            user = load_user()
+
+            if user is None:
+
+                st.warning(
+                    "No account found. Please register first."
+                )
+
+            elif (
+                login_id == user["email"]
+                or login_id == user["username"]
+            ) and hash_password(password) == user["password"]:
+
+                st.session_state.logged_in = True
+
+                st.success("Login successful!")
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "Incorrect email/username or password."
+                )
+
+
+    # =================================================
     # FORGOT PASSWORD
-    # =====================================================
+    # =================================================
 
-    elif option == "Forgot Password":
+    else:
 
         st.subheader("🔑 Forgot Password")
 
-        email = st.text_input("Enter Registered Email")
+        email = st.text_input(
+            "Enter your registered email"
+        )
 
         new_password = st.text_input(
             "New Password",
             type="password"
         )
 
-        confirm_new_password = st.text_input(
+        confirm_password = st.text_input(
             "Confirm New Password",
             type="password"
         )
@@ -196,78 +176,51 @@ if not st.session_state.logged_in:
             use_container_width=True
         ):
 
-            if not email or not new_password:
-                st.warning("Please fill all fields.")
+            user = load_user()
+
+            if user is None:
+
+                st.error(
+                    "No registered account found."
+                )
+
+            elif email != user["email"]:
+
+                st.error(
+                    "Email does not match the registered email."
+                )
 
             elif len(new_password) < 6:
+
                 st.error(
                     "Password must contain at least 6 characters."
                 )
 
-            elif new_password != confirm_new_password:
-                st.error("Passwords do not match.")
+            elif new_password != confirm_password:
+
+                st.error(
+                    "Passwords do not match."
+                )
 
             else:
 
-                cursor.execute(
-                    "SELECT * FROM users WHERE email = ?",
-                    (email,)
+                user["password"] = hash_password(
+                    new_password
                 )
 
-                user = cursor.fetchone()
+                save_user(user)
 
-                if user:
+                st.success(
+                    "Password reset successfully! "
+                    "You can now login."
+                )
 
-                    hashed_password = hash_password(
-                        new_password
-                    )
-
-                    cursor.execute(
-                        """
-                        UPDATE users
-                        SET password = ?
-                        WHERE email = ?
-                        """,
-                        (hashed_password, email)
-                    )
-
-                    conn.commit()
-
-                    st.success(
-                        "Password reset successfully! "
-                        "You can now login."
-                    )
-
-                else:
-                    st.error(
-                        "No account found with this email."
-                    )
-
-
-    # IMPORTANT:
-    # Stop here until user logs in
     st.stop()
 
 
-# =========================================================
-# LOGOUT
-# =========================================================
-
-st.sidebar.success(
-    f"Welcome, {st.session_state.username}!"
-)
-
-if st.sidebar.button("Logout"):
-
-    st.session_state.logged_in = False
-    st.session_state.username = ""
-
-    st.rerun()
-
-
-# =========================================================
-# YOUR EXISTING CAREERMATCH AI CODE
-# =========================================================
+# =====================================================
+# CAREERMATCH AI APPLICATION
+# =====================================================
 
 st.title("🤖 CareerMatch AI")
 
@@ -275,9 +228,16 @@ st.write(
     "Find the right job for your career"
 )
 
-# ---------------------------------------------------------
-# PUT YOUR EXISTING CAREERMATCH AI CODE BELOW THIS LINE
-# ---------------------------------------------------------
+
+# =====================================================
+# LOGOUT
+# =====================================================
+
+if st.sidebar.button("Logout"):
+
+    st.session_state.logged_in = False
+
+    st.rerun()
     
 # =========================================================
 # 1. LOAD DATA
