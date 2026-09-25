@@ -3,36 +3,280 @@ import pandas as pd
 import re
 import ast
 
-# ---------------- LOGIN DETAILS ----------------
-USERNAME = "admin"
-PASSWORD = "1234"
+# =========================================================
+# DATABASE
+# =========================================================
 
-# Login state
+conn = sqlite3.connect("users.db", check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL
+)
+""")
+
+conn.commit()
+
+
+# =========================================================
+# PASSWORD HASHING
+# =========================================================
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+# =========================================================
+# SESSION STATE
+# =========================================================
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# ---------------- LOGIN PAGE ----------------
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+
+# =========================================================
+# LOGIN / REGISTER / FORGOT PASSWORD
+# =========================================================
+
 if not st.session_state.logged_in:
 
     st.title("🔐 CareerMatch AI")
-    st.subheader("Login")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    option = st.radio(
+        "Select Option",
+        ["Login", "Create Account", "Forgot Password"],
+        horizontal=True
+    )
 
-    if st.button("Login"):
 
-        if username == USERNAME and password == PASSWORD:
-            st.session_state.logged_in = True
-            st.success("Login successful!")
-            st.rerun()
+    # =====================================================
+    # LOGIN
+    # =====================================================
 
-        else:
-            st.error("Invalid username or password.")
+    if option == "Login":
 
-    st.info("Demo Username: admin | Password: 1234")
+        st.subheader("Login")
 
+        username = st.text_input("Username")
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+        if st.button("Login", use_container_width=True):
+
+            if username == "" or password == "":
+                st.warning("Please enter username and password.")
+
+            else:
+                hashed_password = hash_password(password)
+
+                cursor.execute(
+                    """
+                    SELECT * FROM users
+                    WHERE username = ? AND password = ?
+                    """,
+                    (username, hashed_password)
+                )
+
+                user = cursor.fetchone()
+
+                if user:
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+
+                    st.success("Login successful!")
+                    st.rerun()
+
+                else:
+                    st.error("Invalid username or password.")
+
+
+    # =====================================================
+    # CREATE ACCOUNT
+    # =====================================================
+
+    elif option == "Create Account":
+
+        st.subheader("Create New Account")
+
+        name = st.text_input("Full Name")
+        email = st.text_input("Email")
+        username = st.text_input("Create Username")
+        password = st.text_input(
+            "Create Password",
+            type="password"
+        )
+        confirm_password = st.text_input(
+            "Confirm Password",
+            type="password"
+        )
+
+        if st.button("Register", use_container_width=True):
+
+            if not name or not email or not username or not password:
+                st.warning("Please fill all fields.")
+
+            elif not re.match(
+                r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$",
+                email
+            ):
+                st.error("Please enter a valid email address.")
+
+            elif len(password) < 6:
+                st.error("Password must contain at least 6 characters.")
+
+            elif password != confirm_password:
+                st.error("Passwords do not match.")
+
+            else:
+
+                try:
+                    hashed_password = hash_password(password)
+
+                    cursor.execute(
+                        """
+                        INSERT INTO users
+                        (name, email, username, password)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            name,
+                            email,
+                            username,
+                            hashed_password
+                        )
+                    )
+
+                    conn.commit()
+
+                    st.success(
+                        "Account created successfully! "
+                        "You can now login."
+                    )
+
+                except sqlite3.IntegrityError:
+
+                    st.error(
+                        "Username or email already exists."
+                    )
+
+
+    # =====================================================
+    # FORGOT PASSWORD
+    # =====================================================
+
+    elif option == "Forgot Password":
+
+        st.subheader("🔑 Forgot Password")
+
+        email = st.text_input("Enter Registered Email")
+
+        new_password = st.text_input(
+            "New Password",
+            type="password"
+        )
+
+        confirm_new_password = st.text_input(
+            "Confirm New Password",
+            type="password"
+        )
+
+        if st.button(
+            "Reset Password",
+            use_container_width=True
+        ):
+
+            if not email or not new_password:
+                st.warning("Please fill all fields.")
+
+            elif len(new_password) < 6:
+                st.error(
+                    "Password must contain at least 6 characters."
+                )
+
+            elif new_password != confirm_new_password:
+                st.error("Passwords do not match.")
+
+            else:
+
+                cursor.execute(
+                    "SELECT * FROM users WHERE email = ?",
+                    (email,)
+                )
+
+                user = cursor.fetchone()
+
+                if user:
+
+                    hashed_password = hash_password(
+                        new_password
+                    )
+
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET password = ?
+                        WHERE email = ?
+                        """,
+                        (hashed_password, email)
+                    )
+
+                    conn.commit()
+
+                    st.success(
+                        "Password reset successfully! "
+                        "You can now login."
+                    )
+
+                else:
+                    st.error(
+                        "No account found with this email."
+                    )
+
+
+    # IMPORTANT:
+    # Stop here until user logs in
     st.stop()
+
+
+# =========================================================
+# LOGOUT
+# =========================================================
+
+st.sidebar.success(
+    f"Welcome, {st.session_state.username}!"
+)
+
+if st.sidebar.button("Logout"):
+
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+
+    st.rerun()
+
+
+# =========================================================
+# YOUR EXISTING CAREERMATCH AI CODE
+# =========================================================
+
+st.title("🤖 CareerMatch AI")
+
+st.write(
+    "Find the right job for your career"
+)
+
+# ---------------------------------------------------------
+# PUT YOUR EXISTING CAREERMATCH AI CODE BELOW THIS LINE
+# ---------------------------------------------------------
     
 # =========================================================
 # 1. LOAD DATA
