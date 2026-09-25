@@ -3,7 +3,37 @@ import pandas as pd
 import re
 import ast
 
+# ---------------- LOGIN DETAILS ----------------
+USERNAME = "admin"
+PASSWORD = "1234"
 
+# Login state
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+# ---------------- LOGIN PAGE ----------------
+if not st.session_state.logged_in:
+
+    st.title("🔐 CareerMatch AI")
+    st.subheader("Login")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+
+        if username == USERNAME and password == PASSWORD:
+            st.session_state.logged_in = True
+            st.success("Login successful!")
+            st.rerun()
+
+        else:
+            st.error("Invalid username or password.")
+
+    st.info("Demo Username: admin | Password: 1234")
+
+    st.stop()
+    
 # =========================================================
 # 1. LOAD DATA
 # =========================================================
