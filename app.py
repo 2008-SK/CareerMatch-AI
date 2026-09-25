@@ -7,9 +7,9 @@ import hashlib
 import ast
 
 
-# =========================================================
+# =====================================================
 # PAGE CONFIGURATION
-# =========================================================
+# =====================================================
 
 st.set_page_config(
     page_title="CareerMatch AI",
@@ -19,21 +19,17 @@ st.set_page_config(
 )
 
 
-# =========================================================
+# =====================================================
 # USER DATA FILE
-# =========================================================
+# =====================================================
 
 USER_FILE = "user_data.json"
 
 
 def load_user():
     if os.path.exists(USER_FILE):
-        try:
-            with open(USER_FILE, "r") as file:
-                return json.load(file)
-        except:
-            return None
-
+        with open(USER_FILE, "r") as file:
+            return json.load(file)
     return None
 
 
@@ -46,17 +42,20 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-# =========================================================
+# =====================================================
 # SESSION STATE
-# =========================================================
+# =====================================================
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
+if "page" not in st.session_state:
+    st.session_state.page = "Login"
 
-# =========================================================
+
+# =====================================================
 # LOGIN SYSTEM
-# =========================================================
+# =====================================================
 
 if not st.session_state.logged_in:
 
@@ -68,16 +67,15 @@ if not st.session_state.logged_in:
         horizontal=True
     )
 
-    # =====================================================
+    # =================================================
     # REGISTER
-    # =====================================================
+    # =================================================
 
     if option == "Register":
 
         st.subheader("Create Account")
 
         email = st.text_input("Email")
-
         username = st.text_input("Username")
 
         password = st.text_input(
@@ -115,34 +113,23 @@ if not st.session_state.logged_in:
 
             else:
 
-                existing_user = load_user()
+                user = {
+                    "email": email,
+                    "username": username,
+                    "password": hash_password(password)
+                }
 
-                if existing_user is not None:
+                save_user(user)
 
-                    st.error(
-                        "An account is already registered. "
-                        "Please use Login or Forgot Password."
-                    )
-
-                else:
-
-                    user = {
-                        "email": email.strip(),
-                        "username": username.strip(),
-                        "password": hash_password(password)
-                    }
-
-                    save_user(user)
-
-                    st.success(
-                        "Registration successful! "
-                        "Please select Login and login with your credentials."
-                    )
+                st.success(
+                    "Registration successful! "
+                    "You can now login."
+                )
 
 
-    # =====================================================
+    # =================================================
     # LOGIN
-    # =====================================================
+    # =================================================
 
     elif option == "Login":
 
@@ -171,8 +158,8 @@ if not st.session_state.logged_in:
                 )
 
             elif (
-                login_id.strip() == user["email"]
-                or login_id.strip() == user["username"]
+                login_id == user["email"]
+                or login_id == user["username"]
             ) and hash_password(password) == user["password"]:
 
                 st.session_state.logged_in = True
@@ -190,9 +177,9 @@ if not st.session_state.logged_in:
                 )
 
 
-    # =====================================================
+    # =================================================
     # FORGOT PASSWORD
-    # =====================================================
+    # =================================================
 
     else:
 
@@ -225,7 +212,7 @@ if not st.session_state.logged_in:
                     "No registered account found."
                 )
 
-            elif email.strip() != user["email"]:
+            elif email != user["email"]:
 
                 st.error(
                     "Email does not match the registered email."
@@ -253,15 +240,15 @@ if not st.session_state.logged_in:
 
                 st.success(
                     "Password reset successfully! "
-                    "Please select Login and login again."
+                    "You can now login."
                 )
 
     st.stop()
 
 
-# =========================================================
+# =====================================================
 # LOGOUT
-# =========================================================
+# =====================================================
 
 if st.sidebar.button("Logout"):
 
@@ -270,9 +257,9 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 
-# =========================================================
+# =====================================================
 # LOAD DATA
-# =========================================================
+# =====================================================
 
 try:
 
@@ -283,15 +270,15 @@ try:
 except FileNotFoundError:
 
     st.error(
-        "Cleaned_New_Data.csv file was not found."
+        "❌ Cleaned_New_Data.csv file not found."
     )
 
     st.stop()
 
 
-# =========================================================
-# CHECK REQUIRED COLUMNS
-# =========================================================
+# =====================================================
+# REQUIRED COLUMNS CHECK
+# =====================================================
 
 required_columns = [
     "job_id",
@@ -310,18 +297,18 @@ missing_columns = [
 if missing_columns:
 
     st.error(
-        "Missing required columns: "
-        + ", ".join(missing_columns)
+        f"❌ Missing columns: {missing_columns}"
     )
 
     st.stop()
 
 
-# =========================================================
+# =====================================================
 # CUSTOM CSS
-# =========================================================
+# =====================================================
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 
 .block-container {
@@ -408,14 +395,17 @@ div[data-testid="stExpander"] {
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True
+)
 
 
-# =========================================================
+# =====================================================
 # HEADER
-# =========================================================
+# =====================================================
 
-st.markdown("""
+st.markdown(
+    """
 <div class="hero">
 
 <h1>💼 CareerMatch AI</h1>
@@ -425,12 +415,14 @@ st.markdown("""
 <p>Discover • Explore • Find Your Opportunity</p>
 
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True
+)
 
 
-# =========================================================
+# =====================================================
 # HOW IT WORKS
-# =========================================================
+# =====================================================
 
 st.subheader("🚀 How It Works")
 
@@ -443,43 +435,64 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
 
-    st.markdown("""
-    <div class="step-card">
-    <div class="step-icon">1️⃣</div>
-    <h3>Choose Category</h3>
-    <p>Select your preferred career field.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="step-card">
+
+        <div class="step-icon">1️⃣</div>
+
+        <h3>Choose Category</h3>
+
+        <p>Select your preferred career field.</p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 with col2:
 
-    st.markdown("""
-    <div class="step-card">
-    <div class="step-icon">2️⃣</div>
-    <h3>Choose Position</h3>
-    <p>Select your preferred job position.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="step-card">
+
+        <div class="step-icon">2️⃣</div>
+
+        <h3>Choose Position</h3>
+
+        <p>Select your preferred job position.</p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 with col3:
 
-    st.markdown("""
-    <div class="step-card">
-    <div class="step-icon">3️⃣</div>
-    <h3>Enter Skills</h3>
-    <p>Enter your skills to get job matches.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="step-card">
+
+        <div class="step-icon">3️⃣</div>
+
+        <h3>Enter Skills</h3>
+
+        <p>Enter your skills to get job matches.</p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 st.divider()
 
 
-# =========================================================
+# =====================================================
 # JOB SEARCH
-# =========================================================
+# =====================================================
 
 st.subheader("🔎 Find Your Job")
 
@@ -489,17 +502,18 @@ st.info(
 )
 
 
-# =========================================================
+# =====================================================
 # STEP 1 — CATEGORY
-# =========================================================
+# =====================================================
 
-st.markdown("### 1️⃣ Select Your Career Category")
+st.markdown(
+    "### 1️⃣ Select Your Career Category"
+)
 
 categories = sorted(
     df["category"]
     .dropna()
     .astype(str)
-    .str.strip()
     .unique()
 )
 
@@ -509,9 +523,9 @@ category = st.selectbox(
 )
 
 
-# =========================================================
+# =====================================================
 # STEP 2 — POSITION
-# =========================================================
+# =====================================================
 
 category_jobs = sorted(
     df[
@@ -519,11 +533,12 @@ category_jobs = sorted(
     ]["job_title"]
     .dropna()
     .astype(str)
-    .str.strip()
     .unique()
 )
 
-st.markdown("### 2️⃣ Select Your Job Position")
+st.markdown(
+    "### 2️⃣ Select Your Job Position"
+)
 
 job_title = st.selectbox(
     "💼 Available Positions",
@@ -531,26 +546,30 @@ job_title = st.selectbox(
 )
 
 
-# =========================================================
+# =====================================================
 # STEP 3 — USER SKILLS
-# =========================================================
+# =====================================================
 
-st.markdown("### 3️⃣ Enter Your Skills")
+st.markdown(
+    "### 3️⃣ Enter Your Skills"
+)
 
 st.caption(
-    "Enter all your skills separated by commas. "
-    "You can enter more than 5 skills."
+    "Enter up to 8 relevant skills separated by commas."
 )
 
 user_skills = st.text_input(
     "🛠️ Your Skills",
-    placeholder="Example: Python, SQL, Pandas, Machine Learning, Git, Django"
+    placeholder=(
+        "Example: Python, SQL, Pandas, "
+        "Machine Learning, Git"
+    )
 )
 
 
-# =========================================================
+# =====================================================
 # PROGRESS
-# =========================================================
+# =====================================================
 
 if user_skills.strip():
 
@@ -574,20 +593,159 @@ else:
     )
 
 
-# =========================================================
+# =====================================================
+# SKILL PROCESSING FUNCTIONS
+# =====================================================
+
+def clean_skill(skill):
+
+    skill = str(skill).lower().strip()
+
+    skill = skill.replace("_", " ")
+    skill = skill.replace("-", " ")
+
+    skill = re.sub(
+        r"\s+",
+        " ",
+        skill
+    )
+
+    return skill
+
+
+def extract_required_skills(skill_text):
+
+    if pd.isna(skill_text):
+
+        return set()
+
+    text = str(skill_text).strip()
+
+    if not text:
+
+        return set()
+
+
+    # -------------------------------------------------
+    # Dataset list format
+    # Example:
+    # ['Python', 'SQL', 'Pandas']
+    # -------------------------------------------------
+
+    try:
+
+        parsed = ast.literal_eval(text)
+
+        if isinstance(parsed, list):
+
+            return {
+                clean_skill(skill)
+                for skill in parsed
+                if str(skill).strip()
+            }
+
+    except (ValueError, SyntaxError):
+
+        pass
+
+
+    # -------------------------------------------------
+    # Normal text format
+    # -------------------------------------------------
+
+    text = text.replace(",", "|")
+    text = text.replace(";", "|")
+    text = text.replace("/", "|")
+
+    skills = text.split("|")
+
+    return {
+        clean_skill(skill)
+        for skill in skills
+        if skill.strip()
+    }
+
+
+def extract_user_skills(user_text):
+
+    if not user_text.strip():
+
+        return []
+
+
+    # -------------------------------------------------
+    # Split by comma
+    # -------------------------------------------------
+
+    skills = user_text.split(",")
+
+
+    # -------------------------------------------------
+    # Clean and remove duplicates
+    # -------------------------------------------------
+
+    unique_skills = []
+    seen = set()
+
+    for skill in skills:
+
+        cleaned = clean_skill(skill)
+
+        if cleaned and cleaned not in seen:
+
+            seen.add(cleaned)
+
+            unique_skills.append(cleaned)
+
+
+    # -------------------------------------------------
+    # Maximum 8 user skills
+    # -------------------------------------------------
+
+    return unique_skills[:8]
+
+
+# =====================================================
 # POSITION PREVIEW
-# =========================================================
+# =====================================================
 
 st.subheader("👀 Position Preview")
 
-selected_job = df[
+selected_position_data = df[
     (df["category"] == category) &
     (df["job_title"] == job_title)
-]
+].copy()
 
-if not selected_job.empty:
 
-    first_job = selected_job.iloc[0]
+# =====================================================
+# GET ALL SKILLS FOR SELECTED POSITION
+# =====================================================
+
+selected_position_skills = set()
+
+for skill_text in selected_position_data[
+    "job_skill_set"
+].dropna():
+
+    selected_position_skills.update(
+        extract_required_skills(skill_text)
+    )
+
+
+if selected_position_skills:
+
+    preview_skills = ", ".join(
+        sorted(selected_position_skills)
+    )
+
+else:
+
+    preview_skills = "Skills information not available."
+
+
+if not selected_position_data.empty:
+
+    first_job = selected_position_data.iloc[0]
 
     col1, col2 = st.columns(2)
 
@@ -610,17 +768,18 @@ if not selected_job.empty:
             unsafe_allow_html=True
         )
 
+
     with col2:
 
         st.markdown(
             f"""
             <div class="skill-box">
 
-            <b>🛠️ Example Required Skills</b>
+            <b>🛠️ Skills Available for This Position</b>
 
             <br><br>
 
-            {first_job["job_skill_set"]}
+            {preview_skills}
 
             </div>
             """,
@@ -631,120 +790,9 @@ if not selected_job.empty:
 st.divider()
 
 
-# =========================================================
-# SKILL PROCESSING
-# =========================================================
-
-def clean_skill(skill):
-
-    if skill is None:
-        return ""
-
-    skill = str(skill).strip().lower()
-
-    # Make different separators consistent
-    skill = skill.replace("_", " ")
-    skill = skill.replace("-", " ")
-
-    # Remove extra spaces
-    skill = re.sub(
-        r"\s+",
-        " ",
-        skill
-    )
-
-    return skill.strip()
-
-
-def extract_required_skills(skill_text):
-
-    """
-    Convert dataset job_skill_set into a unique
-    normalized set of skills.
-    """
-
-    if pd.isna(skill_text):
-
-        return set()
-
-    text = str(skill_text).strip()
-
-    if not text:
-
-        return set()
-
-    # -----------------------------------------------------
-    # Try Python-list format
-    # Example:
-    # ['Python', 'SQL', 'Pandas']
-    # -----------------------------------------------------
-
-    try:
-
-        parsed = ast.literal_eval(text)
-
-        if isinstance(
-            parsed,
-            (list, tuple, set)
-        ):
-
-            return {
-                clean_skill(skill)
-                for skill in parsed
-                if clean_skill(skill)
-            }
-
-    except (
-        ValueError,
-        SyntaxError,
-        TypeError
-    ):
-
-        pass
-
-
-    # -----------------------------------------------------
-    # Normal text format
-    # -----------------------------------------------------
-
-    text = text.replace(",", "|")
-    text = text.replace(";", "|")
-    text = text.replace("/", "|")
-
-    skills = text.split("|")
-
-    return {
-        clean_skill(skill)
-        for skill in skills
-        if clean_skill(skill)
-    }
-
-
-def extract_user_skills(user_text):
-
-    """
-    Convert user's comma-separated skills into
-    a unique normalized set.
-
-    No 5-skill limit is applied.
-    """
-
-    if not user_text or not user_text.strip():
-
-        return set()
-
-    skills = user_text.split(",")
-
-    return {
-        clean_skill(skill)
-        for skill in skills
-        if clean_skill(skill)
-    }
-
-
-# =========================================================
+# =====================================================
 # JOB RECOMMENDATION FUNCTION
-# =========================================================
+# =====================================================
 
 def get_recommendations(
     category,
@@ -752,74 +800,125 @@ def get_recommendations(
     user_skills
 ):
 
-    # -----------------------------------------------------
-    # 1. FILTER EXACT CATEGORY + POSITION
-    # -----------------------------------------------------
+    # =================================================
+    # STEP 1 — EXTRACT USER SKILLS
+    # =================================================
 
-    selected_data = df[
+    user_skill_list = extract_user_skills(
+        user_skills
+    )
+
+    if not user_skill_list:
+
+        return pd.DataFrame(), 0, 0, []
+
+
+    user_skill_set = set(
+        user_skill_list
+    )
+
+
+    # =================================================
+    # STEP 2 — GET SELECTED POSITION DATA
+    # =================================================
+
+    selected_position_data = df[
         (df["category"] == category) &
         (df["job_title"] == job_title)
     ].copy()
 
-    if selected_data.empty:
 
-        return selected_data
+    if selected_position_data.empty:
+
+        return pd.DataFrame(), 0, 0, []
 
 
-    # -----------------------------------------------------
-    # 2. GET USER SKILLS
-    # -----------------------------------------------------
+    # =================================================
+    # STEP 3 — FIND ALL UNIQUE SKILLS FOR
+    # SELECTED CATEGORY + POSITION
+    # =================================================
 
-    user_skill_set = extract_user_skills(
-        user_skills
+    all_position_skills = set()
+
+    for skill_text in selected_position_data[
+        "job_skill_set"
+    ].dropna():
+
+        all_position_skills.update(
+            extract_required_skills(skill_text)
+        )
+
+
+    if not all_position_skills:
+
+        return pd.DataFrame(), 0, 0, []
+
+
+    # =================================================
+    # STEP 4 — ONLY RELEVANT USER SKILLS
+    #
+    # User skills that are actually available for
+    # selected position.
+    # =================================================
+
+    relevant_user_skills = (
+        user_skill_set
+        .intersection(
+            all_position_skills
+        )
     )
 
-    if not user_skill_set:
 
-        return selected_data.iloc[0:0]
+    if not relevant_user_skills:
+
+        return pd.DataFrame(), 0, 0, []
 
 
-    # -----------------------------------------------------
-    # 3. GET ALL UNIQUE AVAILABLE SKILLS
+    # =================================================
+    # MAXIMUM 8 RELEVANT SKILLS
+    # =================================================
+
+    relevant_user_skills = set(
+        list(relevant_user_skills)[:8]
+    )
+
+
+    total_considered_skills = len(
+        relevant_user_skills
+    )
+
+
+    total_available_skills = len(
+        all_position_skills
+    )
+
+
+    # =================================================
+    # STEP 5 — SEARCH ALL JOBS IN SAME CATEGORY
     #
-    # IMPORTANT:
-    # These skills come ONLY from the selected
-    # Category + Position.
-    # -----------------------------------------------------
+    # This is important:
+    # We don't restrict results only to the selected
+    # job title, otherwise often only 1 job may appear.
+    # =================================================
 
-    all_available_skills = set()
+    category_data = df[
+        df["category"] == category
+    ].copy()
 
-    for skill_data in selected_data["job_skill_set"]:
-
-        job_skills = extract_required_skills(
-            skill_data
-        )
-
-        all_available_skills.update(
-            job_skills
-        )
-
-
-    # -----------------------------------------------------
-    # 4. CHECK AVAILABLE SKILLS
-    # -----------------------------------------------------
-
-    if not all_available_skills:
-
-        return selected_data.iloc[0:0]
-
-
-    # -----------------------------------------------------
-    # 5. CALCULATE MATCHING SKILLS FOR EACH JOB
-    # -----------------------------------------------------
 
     results = []
 
-    for index, row in selected_data.iterrows():
+
+    # =================================================
+    # STEP 6 — MATCH EACH JOB
+    # =================================================
+
+    for index, row in category_data.iterrows():
 
         required_skills = extract_required_skills(
             row["job_skill_set"]
         )
+
 
         if not required_skills:
 
@@ -827,41 +926,61 @@ def get_recommendations(
 
 
         # -------------------------------------------------
-        # USER SKILLS ∩ JOB SKILLS
+        # Match user's relevant skills with this job
         # -------------------------------------------------
 
         matched_skills = (
-            user_skill_set
-            .intersection(required_skills)
+            relevant_user_skills
+            .intersection(
+                required_skills
+            )
+        )
+
+
+        matched_count = len(
+            matched_skills
         )
 
 
         # -------------------------------------------------
-        # EXACT REQUIRED FORMULA
+        # Ignore jobs with zero match
+        # -------------------------------------------------
+
+        if matched_count == 0:
+
+            continue
+
+
+        # -------------------------------------------------
+        # FINAL MATCHING PERCENTAGE
         #
-        # Match % =
-        # Matched User Skills
-        # -------------------------- × 100
-        # Total Available Unique Skills
-        #
-        # Denominator is calculated from ALL jobs
-        # having the selected Category + Position.
+        # Example:
+        # 7 matched out of 8 = 87.5%
+        # 8 matched out of 8 = 100%
+        # 4 matched out of 5 = 80%
         # -------------------------------------------------
 
         match_percentage = (
-            len(matched_skills)
+            matched_count
             /
-            len(all_available_skills)
+            total_considered_skills
         ) * 100
 
 
         # -------------------------------------------------
-        # ONLY KEEP JOBS WITH AT LEAST ONE MATCH
+        # Selected position priority
+        #
+        # Exact selected position gets priority
+        # when percentage and matched count are same.
         # -------------------------------------------------
 
-        if len(matched_skills) == 0:
-
-            continue
+        position_priority = (
+            1
+            if str(row["job_title"]).strip().lower()
+            ==
+            str(job_title).strip().lower()
+            else 0
+        )
 
 
         results.append(
@@ -869,62 +988,72 @@ def get_recommendations(
                 "index": index,
 
                 "match_percentage":
-                    round(
-                        match_percentage,
-                        2
-                    ),
+                    match_percentage,
 
                 "matched_skills":
                     matched_skills,
 
                 "matched_skill_count":
-                    len(matched_skills),
+                    matched_count,
 
-                "total_available_skills":
-                    len(all_available_skills)
+                "position_priority":
+                    position_priority
             }
         )
 
 
-    # -----------------------------------------------------
-    # 6. CREATE RESULT DATAFRAME
-    # -----------------------------------------------------
+    # =================================================
+    # STEP 7 — NO RESULTS
+    # =================================================
+
+    if not results:
+
+        return (
+            pd.DataFrame(),
+            total_available_skills,
+            total_considered_skills,
+            sorted(relevant_user_skills)
+        )
+
+
+    # =================================================
+    # STEP 8 — CREATE RESULT DATAFRAME
+    # =================================================
 
     result_df = pd.DataFrame(
         results
     )
 
-    if result_df.empty:
 
-        return selected_data.iloc[0:0]
+    # =================================================
+    # STEP 9 — MERGE WITH ORIGINAL DATA
+    # =================================================
 
-
-    # -----------------------------------------------------
-    # 7. MERGE WITH ORIGINAL JOB DATA
-    # -----------------------------------------------------
-
-    recommendations = selected_data.merge(
+    recommendations = category_data.merge(
         result_df,
         left_index=True,
         right_on="index"
     )
 
 
-    # -----------------------------------------------------
-    # 8. SORT BY MATCH PERCENTAGE
+    # =================================================
+    # STEP 10 — SORT
     #
-    # Higher percentage first.
-    # If percentage is same, more matched skills first.
-    # -----------------------------------------------------
+    # 1. Highest percentage
+    # 2. Highest matched skills
+    # 3. Selected position priority
+    # =================================================
 
     recommendations = (
         recommendations
         .sort_values(
             by=[
                 "match_percentage",
-                "matched_skill_count"
+                "matched_skill_count",
+                "position_priority"
             ],
             ascending=[
+                False,
                 False,
                 False
             ]
@@ -933,23 +1062,28 @@ def get_recommendations(
     )
 
 
-    return recommendations
+    return (
+        recommendations,
+        total_available_skills,
+        total_considered_skills,
+        sorted(relevant_user_skills)
+    )
 
 
-# =========================================================
+# =====================================================
 # FIND JOBS
-# =========================================================
+# =====================================================
 
 st.subheader("🎯 Find Your Jobs")
 
 st.write(
     "Get the top 5 jobs that best match your "
-    "selected category, position and skills."
+    "skills and selected career preference."
 )
 
 st.info(
     f"🔎 **Category:** {category}  |  "
-    f"**Position:** {job_title}"
+    f"**Preferred Position:** {job_title}"
 )
 
 
@@ -958,9 +1092,9 @@ if st.button(
     use_container_width=True
 ):
 
-    # -----------------------------------------------------
-    # CHECK SKILLS
-    # -----------------------------------------------------
+    # =================================================
+    # CHECK USER SKILLS
+    # =================================================
 
     if not user_skills.strip():
 
@@ -968,18 +1102,55 @@ if st.button(
             "⚠️ Please enter your skills first."
         )
 
+
     else:
 
-        recommendations = get_recommendations(
+        # =================================================
+        # GET RECOMMENDATIONS
+        # =================================================
+
+        (
+            recommendations,
+            total_available_skills,
+            total_considered_skills,
+            relevant_skills
+        ) = get_recommendations(
             category,
             job_title,
             user_skills
         )
 
 
-        # -------------------------------------------------
+        # =================================================
+        # DISPLAY SKILL INFORMATION
+        # =================================================
+
+        if total_available_skills > 0:
+
+            st.info(
+                f"📊 **Available skills for selected "
+                f"position:** {total_available_skills}  |  "
+                f"**Skills considered for matching:** "
+                f"{total_considered_skills}"
+            )
+
+
+        # =================================================
+        # SHOW CONSIDERED SKILLS
+        # =================================================
+
+        if relevant_skills:
+
+            st.caption(
+                "🛠️ Skills considered: "
+                +
+                ", ".join(relevant_skills)
+            )
+
+
+        # =================================================
         # NO RESULTS
-        # -------------------------------------------------
+        # =================================================
 
         if recommendations.empty:
 
@@ -989,18 +1160,18 @@ if st.button(
 
             st.info(
                 "💡 Try entering skills relevant to "
-                "the selected position."
+                "your selected position."
             )
 
 
         else:
 
-            # ---------------------------------------------
+            # =================================================
             # RESULT HEADER
-            # ---------------------------------------------
+            # =================================================
 
             st.success(
-                "🎉 Top matching jobs generated!"
+                "🎉 Top 5 matching jobs generated!"
             )
 
             st.subheader(
@@ -1008,32 +1179,21 @@ if st.button(
             )
 
             st.caption(
-                "Match percentage = "
-                "Matched user skills ÷ Total unique available "
-                "skills for the selected Category + Position × 100."
+                "Matching percentage is calculated from "
+                "the relevant skills you entered for the "
+                "selected position."
             )
 
 
-            # ---------------------------------------------
-            # AVAILABLE SKILLS INFORMATION
-            # ---------------------------------------------
-
-            total_available_skills = int(
-                recommendations.iloc[0][
-                    "total_available_skills"
-                ]
-            )
-
-            st.info(
-                f"📊 **Total unique available skills "
-                f"for this Category + Position:** "
-                f"{total_available_skills}"
+            st.caption(
+                "📌 Maximum 8 unique user skills are "
+                "considered."
             )
 
 
-            # ---------------------------------------------
-            # DISPLAY TOP 5
-            # ---------------------------------------------
+            # =================================================
+            # DISPLAY TOP 5 JOBS
+            # =================================================
 
             for number, (_, row) in enumerate(
                 recommendations.iterrows(),
@@ -1041,9 +1201,7 @@ if st.button(
             ):
 
                 match_percentage = round(
-                    float(
-                        row["match_percentage"]
-                    ),
+                    row["match_percentage"],
                     1
                 )
 
@@ -1053,9 +1211,9 @@ if st.button(
                 ]
 
 
-                # -----------------------------------------
-                # CONVERT MATCHED SKILLS TO TEXT
-                # -----------------------------------------
+                # -------------------------------------------------
+                # MATCHED SKILLS TEXT
+                # -------------------------------------------------
 
                 if isinstance(
                     matched_skills,
@@ -1083,14 +1241,9 @@ if st.button(
                     )
 
 
-                matched_skill_count = int(
-                    row["matched_skill_count"]
-                )
-
-
-                # -----------------------------------------
+                # =================================================
                 # JOB CARD
-                # -----------------------------------------
+                # =================================================
 
                 st.markdown(
                     f"""
@@ -1106,7 +1259,7 @@ if st.button(
 
                     <div class="match-score">
 
-                    🎯 Best Match: {match_percentage}%
+                    🎯 Match: {match_percentage}%
 
                     </div>
 
@@ -1119,11 +1272,6 @@ if st.button(
 
                     🆔 <b>Job ID:</b>
                     {row["job_id"]}
-
-                    <br><br>
-
-                    🔢 <b>Matched Skills:</b>
-                    {matched_skill_count}
 
                     <br><br>
 
@@ -1144,28 +1292,21 @@ if st.button(
                 )
 
 
-                # -----------------------------------------
+                # =================================================
                 # MATCH PROGRESS
-                # -----------------------------------------
+                # =================================================
 
                 st.progress(
                     min(
-                        max(
-                            int(
-                                round(
-                                    match_percentage
-                                )
-                            ),
-                            0
-                        ),
+                        int(match_percentage),
                         100
                     )
                 )
 
 
-                # -----------------------------------------
+                # =================================================
                 # FULL DETAILS
-                # -----------------------------------------
+                # =================================================
 
                 with st.expander(
                     f"📄 View Full Details - Job {number}"
@@ -1196,9 +1337,7 @@ if st.button(
                     st.write(
                         f"This job has a "
                         f"**{match_percentage}% skill match** "
-                        f"based on the total unique skills "
-                        f"available for the selected "
-                        f"category and position."
+                        f"with your entered skills."
                     )
 
 
@@ -1208,13 +1347,14 @@ if st.button(
                     )
 
 
-# =========================================================
+# =====================================================
 # FOOTER
-# =========================================================
+# =====================================================
 
 st.markdown("---")
 
-st.markdown("""
+st.markdown(
+    """
 <div class="footer">
 
 <b>💼 CareerMatch AI</b>
@@ -1228,4 +1368,6 @@ Smart Job Recommendation System
 Built with Python • Pandas • Streamlit
 
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True
+)
