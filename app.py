@@ -434,6 +434,32 @@ div[data-testid="stExpander"] {
     opacity: 0.7;
 }
 
+.skill-tag {
+    display: inline-block;
+    padding: 6px 10px;
+    margin: 4px;
+    border-radius: 14px;
+    border: 1px solid rgba(128,128,128,0.25);
+    background: rgba(128,128,128,0.06);
+    font-size: 14px;
+}
+
+.gap-card {
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(128,128,128,0.22);
+    background: rgba(128,128,128,0.035);
+    margin-top: 10px;
+}
+
+.insight-card {
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(128,128,128,0.25);
+    background: rgba(128,128,128,0.035);
+    margin-bottom: 12px;
+}
+
 </style>
 """,
     unsafe_allow_html=True
@@ -1222,7 +1248,10 @@ def get_recommendations(
                     len(required_skills),
 
                 "matched_skill_count":
-                    len(matched_skills)
+                    len(matched_skills),
+
+                "missing_skills":
+                    required_skills.difference(matched_skills)
             }
         )
 
@@ -1271,6 +1300,45 @@ def get_recommendations(
 
 
     return recommendations
+
+
+# =====================================================
+# ADVANCED FEATURE — EXPLAINABLE RECOMMENDATION
+# =====================================================
+
+def get_recommendation_explanation(row):
+    matched_count = int(row["matched_skill_count"])
+    required_count = int(row["required_skill_count"])
+    skill_score = float(row["skill_score"])
+    position_score = float(row["position_relevance"])
+
+    if matched_count == 0:
+        skill_reason = "No direct required-skill match was found."
+    else:
+        skill_reason = (
+            f"{matched_count} of {required_count} required skills "
+            "match your entered skills."
+        )
+
+    if position_score >= 80:
+        position_reason = "The selected position is highly relevant to this role."
+    elif position_score > 0:
+        position_reason = "The selected position has some relevance to this role."
+    else:
+        position_reason = "The selected position has no direct word-level match."
+
+    return (
+        f"{skill_reason} {position_reason} "
+        f"Skill matching contributes {skill_score:.1f}% and "
+        f"position relevance contributes {position_score:.1f}% "
+        "to the final recommendation."
+    )
+
+
+def format_skill_list(skills):
+    if not skills:
+        return "None"
+    return ", ".join(sorted(skills))
 
 
 # =====================================================
@@ -1541,12 +1609,158 @@ if st.button(
                         f"{matched_skills_text}"
                     )
 
+                    st.markdown("#### 💡 Why This Job Is Recommended")
+                    st.info(get_recommendation_explanation(row))
+
+                    st.markdown("#### 🧩 Skill Gap Analysis")
+
+                    missing_skills = row.get(
+                        "missing_skills",
+                        set()
+                    )
+
+                    if not isinstance(missing_skills, set):
+                        missing_skills = set()
+
+                    gap_col1, gap_col2 = st.columns(2)
+
+                    with gap_col1:
+                        st.success(
+                            f"✅ Matched Skills: "
+                            f"{row['matched_skill_count']}"
+                        )
+
+                    with gap_col2:
+                        st.warning(
+                            f"📚 Skills to Develop: "
+                            f"{len(missing_skills)}"
+                        )
+
+                    if missing_skills:
+                        missing_skills_text = format_skill_list(
+                            missing_skills
+                        )
+
+                        st.markdown(
+                            f"""
+                            <div class="gap-card">
+                            <b>📚 Recommended Skills to Develop</b>
+                            <br><br>
+                            {missing_skills_text}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                        st.caption(
+                            "Developing these missing skills can improve "
+                            "your suitability for this job role."
+                        )
+                    else:
+                        st.success(
+                            "🎉 You have a direct match with all "
+                            "required skills listed for this job."
+                        )
+
 
                     st.info(
                         "The final percentage is calculated "
                         "using balanced skill matching and "
                         "selected-position relevance."
                     )
+
+
+# =====================================================
+# ADVANCED FEATURE — CAREER INSIGHTS
+# =====================================================
+
+# The insights are shown only after a successful recommendation search.
+if "recommendations" in locals() and isinstance(
+    recommendations, pd.DataFrame
+) and not recommendations.empty:
+
+    st.divider()
+    st.subheader("🚀 Career Insights")
+
+    best_job = recommendations.iloc[0]
+
+    all_missing_skills = set()
+
+    for _, rec_row in recommendations.iterrows():
+        rec_missing = rec_row.get("missing_skills", set())
+
+        if isinstance(rec_missing, set):
+            all_missing_skills.update(rec_missing)
+
+    insight_col1, insight_col2, insight_col3 = st.columns(3)
+
+    with insight_col1:
+        st.markdown(
+            f"""
+            <div class="insight-card">
+            <b>🏆 Best Current Match</b>
+            <h3>{best_job["job_title"]}</h3>
+            <p>
+            Match: <b>{float(best_job["match_percentage"]):.1f}%</b>
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with insight_col2:
+        st.markdown(
+            f"""
+            <div class="insight-card">
+            <b>🎯 Matching Skills</b>
+            <h3>{int(best_job["matched_skill_count"])}</h3>
+            <p>skills matched in the best recommendation</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with insight_col3:
+        st.markdown(
+            f"""
+            <div class="insight-card">
+            <b>📚 Skill Development</b>
+            <h3>{len(all_missing_skills)}</h3>
+            <p>unique skills identified across Top 5 jobs</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    if all_missing_skills:
+        st.markdown("#### 📚 Skills You Can Develop Next")
+
+        skills_html = "".join(
+            f'<span class="skill-tag">📌 {skill}</span>'
+            for skill in sorted(all_missing_skills)
+        )
+
+        st.markdown(
+            f"""
+            <div class="gap-card">
+            {skills_html}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.caption(
+            "These skills are identified from the required skills "
+            "of your Top 5 recommendations and can guide your "
+            "future learning and career preparation."
+        )
+
+    st.markdown("#### 🔎 Alternative Career Opportunities")
+    st.write(
+        "The Top 5 recommendations also provide alternative roles "
+        "within your selected career category based on your current "
+        "skills and selected-position relevance."
+    )
 
 
 # =====================================================
@@ -1574,3 +1788,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
