@@ -1,6 +1,6 @@
 streamlit
 pandas
-numpy
-sentence-transformers
-pypdf
+pdfplumber
 python-docx
+sentence-transformers
+torch
