@@ -5,7 +5,18 @@ import json
 import os
 import hashlib
 import ast
-import numpy as np
+from urllib.parse import quote_plus
+
+# Optional AI / resume libraries
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
 
 try:
     from pypdf import PdfReader
@@ -17,18 +28,10 @@ try:
 except ImportError:
     Document = None
 
-try:
-    from sentence_transformers import SentenceTransformer
-    AI_MODEL_AVAILABLE = True
-except ImportError:
-    SentenceTransformer = None
-    AI_MODEL_AVAILABLE = False
-
 
 # =====================================================
 # PAGE CONFIGURATION
 # =====================================================
-
 st.set_page_config(
     page_title="CareerMatch AI",
     page_icon="💼",
@@ -38,454 +41,153 @@ st.set_page_config(
 
 
 # =====================================================
-# USER DATA FILE
+# USER DATA / LOGIN
 # =====================================================
-
 USER_FILE = "user_data.json"
 
 
 def load_user():
-
     if os.path.exists(USER_FILE):
-
         try:
-            with open(USER_FILE, "r") as file:
+            with open(USER_FILE, "r", encoding="utf-8") as file:
                 return json.load(file)
-
-        except:
+        except Exception:
             return None
-
     return None
 
 
 def save_user(user):
-
-    with open(USER_FILE, "w") as file:
+    with open(USER_FILE, "w", encoding="utf-8") as file:
         json.dump(user, file)
 
 
 def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-    return hashlib.sha256(
-        password.encode()
-    ).hexdigest()
-
-
-# =====================================================
-# SESSION STATE
-# =====================================================
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-
-if "page" not in st.session_state:
-    st.session_state.page = "Login"
-
-
-# =====================================================
-# LOGIN SYSTEM
-# =====================================================
-
 if not st.session_state.logged_in:
-
     st.title("🔐 CareerMatch AI")
-
     option = st.radio(
         "Choose an option",
         ["Login", "Register", "Forgot Password"],
         horizontal=True
     )
 
-
-    # =================================================
-    # REGISTER
-    # =================================================
-
     if option == "Register":
-
         st.subheader("Create Account")
-
         email = st.text_input("Email")
-
         username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
 
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        confirm_password = st.text_input(
-            "Confirm Password",
-            type="password"
-        )
-
-
-        if st.button(
-            "Register",
-            use_container_width=True
-        ):
-
+        if st.button("Register", use_container_width=True):
             if not email or not username or not password:
-
-                st.warning(
-                    "Please fill all fields."
-                )
-
+                st.warning("Please fill all fields.")
             elif password != confirm_password:
-
-                st.error(
-                    "Passwords do not match."
-                )
-
+                st.error("Passwords do not match.")
             elif len(password) < 6:
-
-                st.error(
-                    "Password must contain at least 6 characters."
-                )
-
+                st.error("Password must contain at least 6 characters.")
             else:
-
-                user = {
+                save_user({
                     "email": email,
                     "username": username,
                     "password": hash_password(password)
-                }
-
-                save_user(user)
-
-                st.success(
-                    "Registration successful! "
-                    "You can now login."
-                )
-
-
-    # =================================================
-    # LOGIN
-    # =================================================
+                })
+                st.success("Registration successful! You can now login.")
 
     elif option == "Login":
-
         st.subheader("Login")
+        login_id = st.text_input("Email or Username")
+        password = st.text_input("Password", type="password")
 
-        login_id = st.text_input(
-            "Email or Username"
-        )
-
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-
-        if st.button(
-            "Login",
-            use_container_width=True
-        ):
-
+        if st.button("Login", use_container_width=True):
             user = load_user()
-
-
             if user is None:
-
-                st.warning(
-                    "No account found. Please register first."
-                )
-
-
+                st.warning("No account found. Please register first.")
             elif (
-                login_id == user["email"]
-                or
-                login_id == user["username"]
-            ) and (
-                hash_password(password)
-                ==
-                user["password"]
+                (login_id == user.get("email") or login_id == user.get("username"))
+                and hash_password(password) == user.get("password")
             ):
-
                 st.session_state.logged_in = True
-
-                st.success(
-                    "Login successful!"
-                )
-
+                st.success("Login successful!")
                 st.rerun()
-
-
             else:
-
-                st.error(
-                    "Incorrect email/username or password."
-                )
-
-
-    # =================================================
-    # FORGOT PASSWORD
-    # =================================================
+                st.error("Incorrect email/username or password.")
 
     else:
-
         st.subheader("🔑 Forgot Password")
+        email = st.text_input("Enter your registered email")
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm New Password", type="password")
 
-        email = st.text_input(
-            "Enter your registered email"
-        )
-
-        new_password = st.text_input(
-            "New Password",
-            type="password"
-        )
-
-        confirm_password = st.text_input(
-            "Confirm New Password",
-            type="password"
-        )
-
-
-        if st.button(
-            "Reset Password",
-            use_container_width=True
-        ):
-
+        if st.button("Reset Password", use_container_width=True):
             user = load_user()
-
-
             if user is None:
-
-                st.error(
-                    "No registered account found."
-                )
-
-
-            elif email != user["email"]:
-
-                st.error(
-                    "Email does not match the registered email."
-                )
-
-
+                st.error("No registered account found.")
+            elif email != user.get("email"):
+                st.error("Email does not match the registered email.")
             elif len(new_password) < 6:
-
-                st.error(
-                    "Password must contain at least 6 characters."
-                )
-
-
+                st.error("Password must contain at least 6 characters.")
             elif new_password != confirm_password:
-
-                st.error(
-                    "Passwords do not match."
-                )
-
-
+                st.error("Passwords do not match.")
             else:
-
-                user["password"] = hash_password(
-                    new_password
-                )
-
+                user["password"] = hash_password(new_password)
                 save_user(user)
-
-                st.success(
-                    "Password reset successfully! "
-                    "You can now login."
-                )
-
+                st.success("Password reset successfully! You can now login.")
 
     st.stop()
 
 
-# =====================================================
-# LOGOUT
-# =====================================================
-
 if st.sidebar.button("Logout"):
-
     st.session_state.logged_in = False
-
     st.rerun()
 
 
 # =====================================================
-# LOAD DATA
+# DATASET
 # =====================================================
-
-df = pd.read_csv(
-    "Cleaned_New_Data.csv"
-)
-
-
-# =====================================================
-# BASIC DATA CLEANING
-# =====================================================
-
-required_columns = [
-    "job_id",
-    "category",
-    "job_title",
-    "job_description",
-    "job_skill_set"
-]
-
-
-missing_columns = [
-    column
-    for column in required_columns
-    if column not in df.columns
-]
-
-
-if missing_columns:
-
-    st.error(
-        "Dataset is missing required columns: "
-        + ", ".join(missing_columns)
-    )
-
+try:
+    df = pd.read_csv("Cleaned_New_Data.csv")
+except Exception as e:
+    st.error(f"Unable to load Cleaned_New_Data.csv: {e}")
     st.stop()
 
+required_columns = [
+    "job_id", "category", "job_title", "job_description", "job_skill_set"
+]
+missing_columns = [c for c in required_columns if c not in df.columns]
+if missing_columns:
+    st.error("Dataset is missing required columns: " + ", ".join(missing_columns))
+    st.stop()
 
-df["category"] = (
-    df["category"]
-    .fillna("")
-    .astype(str)
-    .str.strip()
-)
-
-
-df["job_title"] = (
-    df["job_title"]
-    .fillna("")
-    .astype(str)
-    .str.strip()
-)
+for column in required_columns:
+    df[column] = df[column].fillna("").astype(str).str.strip()
 
 
 # =====================================================
-# CUSTOM CSS
+# CSS
 # =====================================================
-
 st.markdown(
     """
 <style>
-
-.block-container {
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
-}
-
-.hero {
-    text-align: center;
-    padding: 35px;
-    border-radius: 22px;
-    border: 1px solid rgba(128,128,128,0.25);
-    margin-bottom: 30px;
-    background: linear-gradient(
-        135deg,
-        rgba(128,128,128,0.08),
-        rgba(128,128,128,0.02)
-    );
-}
-
-.hero h1 {
-    font-size: 42px;
-    margin-bottom: 8px;
-}
-
-.hero p {
-    font-size: 18px;
-}
-
-.step-card {
-    padding: 20px;
-    border-radius: 18px;
-    border: 1px solid rgba(128,128,128,0.25);
-    min-height: 150px;
-    text-align: center;
-    background: rgba(128,128,128,0.03);
-}
-
-.step-icon {
-    font-size: 30px;
-}
-
-.preference-card,
-.skill-box {
-    padding: 20px;
-    border-radius: 17px;
-    border: 1px solid rgba(128,128,128,0.25);
-    background: rgba(128,128,128,0.03);
-}
-
-.job-card {
-    padding: 22px;
-    border-radius: 18px;
-    border: 1px solid rgba(128,128,128,0.25);
-    margin-bottom: 18px;
-    background: rgba(128,128,128,0.025);
-}
-
-.job-title {
-    font-size: 24px;
-    font-weight: 700;
-}
-
-.match-score {
-    font-size: 22px;
-    font-weight: 700;
-}
-
-.stButton > button {
-    height: 52px;
-    border-radius: 12px;
-    font-size: 17px;
-    font-weight: 600;
-}
-
-div[data-testid="stExpander"] {
-    border-radius: 12px;
-}
-
-.footer {
-    text-align: center;
-    padding: 20px;
-    opacity: 0.7;
-}
-
-.skill-tag {
-    display: inline-block;
-    padding: 6px 10px;
-    margin: 4px;
-    border-radius: 14px;
-    border: 1px solid rgba(128,128,128,0.25);
-    background: rgba(128,128,128,0.06);
-    font-size: 14px;
-}
-
-.gap-card {
-    padding: 16px;
-    border-radius: 14px;
-    border: 1px solid rgba(128,128,128,0.22);
-    background: rgba(128,128,128,0.035);
-    margin-top: 10px;
-}
-
-.ai-card {
-    padding: 18px;
-    border-radius: 16px;
-    border: 1px solid rgba(128,128,128,0.25);
-    background: rgba(128,128,128,0.035);
-    margin: 12px 0;
-}
-
-.insight-card {
-    padding: 18px;
-    border-radius: 16px;
-    border: 1px solid rgba(128,128,128,0.25);
-    background: rgba(128,128,128,0.035);
-    margin-bottom: 12px;
-}
-
+.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+.hero { text-align:center; padding:35px; border-radius:22px; border:1px solid rgba(128,128,128,.25); margin-bottom:30px; background:linear-gradient(135deg,rgba(128,128,128,.08),rgba(128,128,128,.02)); }
+.hero h1 { font-size:42px; margin-bottom:8px; }
+.hero p { font-size:18px; }
+.step-card,.feature-card,.skill-box,.job-card,.gap-card { padding:20px; border-radius:18px; border:1px solid rgba(128,128,128,.25); background:rgba(128,128,128,.03); }
+.step-card { min-height:150px; text-align:center; }
+.step-icon { font-size:30px; }
+.job-card { margin-bottom:18px; }
+.job-title { font-size:24px; font-weight:700; }
+.match-score { font-size:22px; font-weight:700; }
+.skill-tag { display:inline-block; padding:5px 10px; margin:3px; border-radius:12px; border:1px solid rgba(128,128,128,.25); }
+.missing-tag { display:inline-block; padding:6px 11px; margin:3px; border-radius:12px; border:1px solid rgba(180,100,100,.35); }
+.stButton > button { min-height:48px; border-radius:12px; font-size:16px; font-weight:600; }
+.footer { text-align:center; padding:20px; opacity:.7; }
+.small-note { opacity:.75; font-size:14px; }
 </style>
 """,
     unsafe_allow_html=True
@@ -493,1462 +195,469 @@ div[data-testid="stExpander"] {
 
 
 # =====================================================
+# HELPERS - DEFINED BEFORE ANY CALLS
+# =====================================================
+def clean_skill(skill):
+    if skill is None:
+        return ""
+    skill = str(skill).lower().strip()
+    skill = skill.replace("_", " ").replace("-", " ")
+    skill = re.sub(r"\s+", " ", skill)
+    return skill.strip()
+
+
+def extract_required_skills(skill_text):
+    if not skill_text or str(skill_text).strip().lower() in {"nan", "none"}:
+        return set()
+
+    text = str(skill_text).strip()
+    try:
+        parsed = ast.literal_eval(text)
+        if isinstance(parsed, (list, tuple, set)):
+            return {clean_skill(x) for x in parsed if clean_skill(x)}
+    except (ValueError, SyntaxError):
+        pass
+
+    text = re.sub(r"[\[\]\"']", "", text)
+    text = text.replace(",", "|").replace(";", "|").replace("/", "|")
+    return {clean_skill(x) for x in text.split("|") if clean_skill(x)}
+
+
+def extract_user_skills(user_text):
+    if not user_text or not str(user_text).strip():
+        return set()
+    return {clean_skill(x) for x in str(user_text).split(",") if clean_skill(x)}
+
+
+def calculate_position_similarity(user_position, job_position):
+    user_position = clean_skill(user_position)
+    job_position = clean_skill(job_position)
+    if not user_position or not job_position:
+        return 0.0
+    if user_position == job_position:
+        return 100.0
+    user_words = set(user_position.split())
+    job_words = set(job_position.split())
+    union_words = user_words | job_words
+    common_words = user_words & job_words
+    if not union_words:
+        return 0.0
+    return round((len(common_words) / len(union_words)) * 100, 2)
+
+
+def calculate_skill_score(user_skill_set, required_skill_set):
+    if not user_skill_set or not required_skill_set:
+        return 0.0, 0.0, 0.0, set()
+
+    matched = user_skill_set.intersection(required_skill_set)
+    matched_count = len(matched)
+    precision = matched_count / len(user_skill_set)
+    recall = matched_count / len(required_skill_set)
+    f1 = 0.0 if precision + recall == 0 else (2 * precision * recall) / (precision + recall)
+    return round(f1 * 100, 2), round(precision * 100, 2), round(recall * 100, 2), matched
+
+
+def extract_resume_text(uploaded_file):
+    if uploaded_file is None:
+        return ""
+    file_name = uploaded_file.name.lower()
+    try:
+        if file_name.endswith(".pdf"):
+            if PdfReader is None:
+                return ""
+            reader = PdfReader(uploaded_file)
+            return "\n".join((page.extract_text() or "") for page in reader.pages)
+        if file_name.endswith(".docx"):
+            if Document is None:
+                return ""
+            document = Document(uploaded_file)
+            return "\n".join(p.text for p in document.paragraphs)
+        if file_name.endswith(".txt"):
+            return uploaded_file.getvalue().decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+    return ""
+
+
+def build_skill_vocabulary(dataframe):
+    skills = set()
+    for value in dataframe["job_skill_set"].tolist():
+        skills.update(extract_required_skills(value))
+    return skills
+
+
+def extract_skills_from_resume(resume_text, skill_vocabulary):
+    """AI-assisted resume extraction using the project's known skill vocabulary.
+    It avoids inventing skills that do not exist in the dataset.
+    """
+    if not resume_text:
+        return set()
+
+    normalized_resume = clean_skill(resume_text)
+    found = set()
+
+    # Longest phrases first reduces partial-match problems.
+    for skill in sorted(skill_vocabulary, key=len, reverse=True):
+        if not skill:
+            continue
+        pattern = r"(?<![a-z0-9+#.])" + re.escape(skill) + r"(?![a-z0-9+#.])"
+        if re.search(pattern, normalized_resume, flags=re.IGNORECASE):
+            found.add(skill)
+
+    return found
+
+
+@st.cache_resource(show_spinner=False)
+def load_semantic_model():
+    if SentenceTransformer is None:
+        return None
+    try:
+        return SentenceTransformer("all-MiniLM-L6-v2")
+    except Exception:
+        return None
+
+
+def semantic_scores(user_profile, job_texts):
+    """Return cosine-similarity scores in percentage form."""
+    model = load_semantic_model()
+    if model is None or not job_texts or np is None:
+        return [0.0] * len(job_texts)
+    try:
+        embeddings = model.encode(
+            [user_profile] + job_texts,
+            normalize_embeddings=True,
+            show_progress_bar=False
+        )
+        scores = np.dot(embeddings[1:], embeddings[0]) * 100
+        return [round(float(max(0.0, min(100.0, s))), 2) for s in scores]
+    except Exception:
+        return [0.0] * len(job_texts)
+
+
+def combined_score(skill_score, semantic_score, position_score, ai_available):
+    if ai_available:
+        # Exact skill matching remains the strongest signal.
+        score = (skill_score * 0.60) + (semantic_score * 0.30) + (position_score * 0.10)
+    else:
+        score = (skill_score * 0.85) + (position_score * 0.15)
+    return round(max(0.0, min(100.0, score)), 2)
+
+
+def youtube_search_url(skill):
+    query = quote_plus(f"{skill} tutorial for beginners")
+    return f"https://www.youtube.com/results?search_query={query}"
+
+
+def display_skill_tags(skills, missing=False):
+    if not skills:
+        return "<span class='small-note'>None</span>"
+    cls = "missing-tag" if missing else "skill-tag"
+    return " ".join(f"<span class='{cls}'>{skill.title()}</span>" for skill in sorted(skills))
+
+
+def get_recommendations(category, job_title, user_skill_set, manual_skill_count, use_ai=True):
+    category_data = df[df["category"] == category].copy()
+    if category_data.empty or not user_skill_set:
+        return category_data.iloc[0:0], False
+
+    # Build one profile for semantic matching.
+    profile_skills = ", ".join(sorted(user_skill_set))
+    user_profile = f"Career category: {category}. Desired position: {job_title}. Skills: {profile_skills}."
+
+    job_texts = [
+        f"Job title: {row['job_title']}. Job description: {row['job_description']}. Required skills: {row['job_skill_set']}."
+        for _, row in category_data.iterrows()
+    ]
+
+    ai_scores = semantic_scores(user_profile, job_texts) if use_ai else [0.0] * len(job_texts)
+    ai_available = use_ai and SentenceTransformer is not None and load_semantic_model() is not None
+
+    results = []
+    for position, (index, row) in enumerate(category_data.iterrows()):
+        required_skills = extract_required_skills(row["job_skill_set"])
+        if not required_skills:
+            continue
+
+        skill_score, precision, recall, matched = calculate_skill_score(user_skill_set, required_skills)
+        position_score = calculate_position_similarity(job_title, row["job_title"])
+        semantic_score = ai_scores[position] if position < len(ai_scores) else 0.0
+        final_score = combined_score(skill_score, semantic_score, position_score, ai_available)
+        missing = required_skills - matched
+
+        results.append({
+            "index": index,
+            "match_percentage": final_score,
+            "matched_skills": matched,
+            "missing_skills": missing,
+            "skill_score": skill_score,
+            "precision_percentage": precision,
+            "recall_percentage": recall,
+            "semantic_score": semantic_score,
+            "position_relevance": position_score,
+            "required_skill_count": len(required_skills),
+            "matched_skill_count": len(matched),
+            "manual_skill_count": manual_skill_count
+        })
+
+    if not results:
+        return category_data.iloc[0:0], ai_available
+
+    result_df = pd.DataFrame(results)
+    recommendations = category_data.merge(result_df, left_index=True, right_on="index")
+    recommendations = recommendations.sort_values(
+        by=["match_percentage", "skill_score", "semantic_score", "position_relevance"],
+        ascending=False
+    ).head(5)
+    return recommendations, ai_available
+
+
+# =====================================================
 # HEADER
 # =====================================================
-
 st.markdown(
     """
 <div class="hero">
-
 <h1>💼 CareerMatch AI</h1>
-
-<p>Find the right job for your career</p>
-
+<p>AI-Assisted Smart Job Recommendation System</p>
 <p>Discover • Explore • Find Your Opportunity</p>
-
 </div>
 """,
     unsafe_allow_html=True
 )
 
-
-# =====================================================
-# HOW IT WORKS
-# =====================================================
-
 st.subheader("🚀 How It Works")
-
-st.write(
-    "Choose your category, position and skills "
-    "to find the most suitable job opportunities."
-)
-
-
-col1, col2, col3 = st.columns(3)
-
-
-with col1:
-
-    st.markdown(
-        """
-        <div class="step-card">
-
-        <div class="step-icon">1️⃣</div>
-
-        <h3>Choose Category</h3>
-
-        <p>Select your preferred career field.</p>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-with col2:
-
-    st.markdown(
-        """
-        <div class="step-card">
-
-        <div class="step-icon">2️⃣</div>
-
-        <h3>Choose Position</h3>
-
-        <p>Select your preferred job position.</p>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-with col3:
-
-    st.markdown(
-        """
-        <div class="step-card">
-
-        <div class="step-icon">3️⃣</div>
-
-        <h3>Enter Skills</h3>
-
-        <p>Enter your skills to get job matches.</p>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+cols = st.columns(4)
+steps = [
+    ("1️⃣", "Resume / Skills", "Upload a resume or enter skills manually."),
+    ("2️⃣", "AI Skill Extraction", "Identify relevant skills from the resume."),
+    ("3️⃣", "NLP Matching", "Compare skills and job descriptions semantically."),
+    ("4️⃣", "Career Insights", "See Top 5 jobs, skill gaps and learning links.")
+]
+for col, (icon, title, desc) in zip(cols, steps):
+    with col:
+        st.markdown(
+            f"<div class='step-card'><div class='step-icon'>{icon}</div><h3>{title}</h3><p>{desc}</p></div>",
+            unsafe_allow_html=True
+        )
 
 st.divider()
 
 
 # =====================================================
-# JOB SEARCH
+# INPUTS
 # =====================================================
-
 st.subheader("🔎 Find Your Job")
+st.info("Select a category and position, then use manual skills, a resume, or both.")
 
-st.info(
-    "👋 Select a **Category**, choose a **Position**, "
-    "and enter your **Skills** to get the top 5 recommendations."
-)
-
-
-# =====================================================
-# STEP 1 — CATEGORY
-# =====================================================
-
-st.markdown(
-    "### 1️⃣ Select Your Career Category"
-)
-
-
-categories = sorted(
-    df["category"]
-    .dropna()
-    .astype(str)
-    .str.strip()
-    .loc[lambda x: x != ""]
-    .unique()
-)
-
-
+categories = sorted(df["category"].dropna().astype(str).str.strip().loc[lambda x: x != ""].unique())
 if not categories:
-
-    st.error(
-        "No career categories found in dataset."
-    )
-
+    st.error("No career categories found in dataset.")
     st.stop()
 
+category = st.selectbox("📂 Career Category", categories)
 
-category = st.selectbox(
-    "📂 Career Category",
-    categories
-)
-
-
-# =====================================================
-# STEP 2 — POSITION
-# =====================================================
-
-category_data = df[
-    df["category"] == category
-].copy()
-
-
-category_jobs = sorted(
-    category_data["job_title"]
-    .dropna()
-    .astype(str)
-    .str.strip()
-    .loc[lambda x: x != ""]
-    .unique()
-)
-
-
-st.markdown(
-    "### 2️⃣ Select Your Job Position"
-)
-
-
+category_data = df[df["category"] == category].copy()
+category_jobs = sorted(category_data["job_title"].dropna().astype(str).str.strip().loc[lambda x: x != ""].unique())
 if not category_jobs:
-
-    st.error(
-        "No job positions found for this category."
-    )
-
+    st.error("No job positions found for this category.")
     st.stop()
 
+job_title = st.selectbox("💼 Available Positions", category_jobs)
 
-job_title = st.selectbox(
-    "💼 Available Positions",
-    category_jobs
+col1, col2 = st.columns(2)
+with col1:
+    manual_skills_text = st.text_input(
+        "🛠️ Your Skills",
+        placeholder="Example: Python, SQL, Pandas, Machine Learning"
+    )
+with col2:
+    resume_file = st.file_uploader(
+        "📄 Upload Resume (PDF / DOCX / TXT)",
+        type=["pdf", "docx", "txt"]
+    )
+
+use_ai = st.checkbox(
+    "🤖 Enable NLP Semantic Matching",
+    value=True,
+    help="Uses a pretrained sentence-transformer model to compare your profile with job descriptions and required skills."
 )
 
 
 # =====================================================
-# STEP 3 — USER SKILLS
+# RESUME PROCESSING
 # =====================================================
-
-st.markdown(
-    "### 3️⃣ Add Your Skills or Upload Resume"
-)
-
-resume_file = st.file_uploader(
-    "📄 Upload Resume",
-    type=["pdf", "docx", "txt"],
-    help="Upload your resume in PDF, DOCX or TXT format. The system extracts relevant skills and uses them for job matching."
-)
-
+manual_skill_set = extract_user_skills(manual_skills_text)
 resume_text = ""
 resume_skills = set()
 
 if resume_file is not None:
-
     resume_text = extract_resume_text(resume_file)
-
     if resume_text:
-        resume_skills = extract_skills_from_resume(
-            resume_text,
-            df
-        )
-
-        st.success(
-            f"📄 Resume processed successfully. "
-            f"{len(resume_skills)} relevant skills identified."
-        )
-
+        skill_vocabulary = build_skill_vocabulary(df)
+        resume_skills = extract_skills_from_resume(resume_text, skill_vocabulary)
+        st.success(f"Resume processed successfully: {resume_file.name}")
         if resume_skills:
-            st.markdown("**🤖 AI/NLP Identified Skills:**")
-            st.write(
-                ", ".join(
-                    sorted(resume_skills)
-                )
-            )
+            st.markdown("### 🤖 AI/NLP Identified Skills")
+            st.markdown(display_skill_tags(resume_skills), unsafe_allow_html=True)
         else:
-            st.warning(
-                "No dataset-mapped skills were identified from the resume. "
-                "You can still enter skills manually below."
-            )
+            st.warning("No dataset-recognized skills were identified from the resume. You can add skills manually.")
     else:
-        st.error(
-            "Could not read the uploaded resume. "
-            "Please upload a valid PDF, DOCX or TXT file."
-        )
+        st.error("The resume could not be read. Please try another PDF, DOCX or TXT file.")
 
-st.caption(
-    "You can enter skills manually, upload a resume, or use both."
-)
+combined_skills = manual_skill_set | resume_skills
 
-manual_user_skills = st.text_input(
-    "🛠️ Your Skills",
-    placeholder=(
-        "Example: Python, SQL, Pandas, "
-        "Machine Learning"
-    )
-)
-
-manual_skill_set = extract_user_skills(
-    manual_user_skills
-)
-
-combined_skill_set = (
-    manual_skill_set | resume_skills
-)
-
-user_skills = ", ".join(
-    sorted(combined_skill_set)
-)
-
-if resume_skills:
-    st.info(
-        f"🎯 Matching will use {len(combined_skill_set)} combined skills "
-        f"from your resume and manual input."
-    )
-
-
-# =====================================================
-# PROGRESS
-# =====================================================
-
-if user_skills.strip():
-
-    st.progress(100)
-
+if combined_skills:
+    st.markdown("### 👤 Candidate Skill Profile")
+    st.markdown(display_skill_tags(combined_skills), unsafe_allow_html=True)
     st.caption(
-        "✅ Category selected  |  "
-        "✅ Position selected  |  "
-        "✅ Skills added  |  "
-        "🚀 Ready to find jobs"
-    )
-
-else:
-
-    st.progress(66)
-
-    st.caption(
-        "✅ Category selected  |  "
-        "✅ Position selected  |  "
-        "⏳ Add your skills"
+        f"{len(manual_skill_set)} manual skill(s) + {len(resume_skills)} resume skill(s) → {len(combined_skills)} unique skill(s)"
     )
 
 
 # =====================================================
 # POSITION PREVIEW
 # =====================================================
-
-st.subheader(
-    "👀 Position Preview"
-)
-
-
-selected_job = df[
-    (df["category"] == category)
-    &
-    (df["job_title"] == job_title)
-]
-
-
+st.subheader("👀 Position Preview")
+selected_job = df[(df["category"] == category) & (df["job_title"] == job_title)]
 if not selected_job.empty:
-
     first_job = selected_job.iloc[0]
-
-
-    col1, col2 = st.columns(2)
-
-
-    with col1:
-
+    c1, c2 = st.columns(2)
+    with c1:
         st.markdown(
-            f"""
-            <div class="preference-card">
-
-            <b>📂 Career Category</b>
-
-            <h3>{category}</h3>
-
-            <b>💼 Selected Position</b>
-
-            <h3>{job_title}</h3>
-
-            </div>
-            """,
+            f"<div class='feature-card'><b>📂 Career Category</b><h3>{category}</h3><b>💼 Selected Position</b><h3>{job_title}</h3></div>",
             unsafe_allow_html=True
         )
-
-
-    with col2:
-
+    with c2:
         st.markdown(
-            f"""
-            <div class="skill-box">
-
-            <b>🛠️ Example Required Skills</b>
-
-            <br><br>
-
-            {first_job["job_skill_set"]}
-
-            </div>
-            """,
+            f"<div class='skill-box'><b>🛠️ Example Required Skills</b><br><br>{first_job['job_skill_set']}</div>",
             unsafe_allow_html=True
         )
-
-
-st.divider()
-
-
-# =====================================================
-# SKILL NORMALIZATION
-# =====================================================
-
-def clean_skill(skill):
-
-    if skill is None:
-        return ""
-
-    skill = str(skill).lower().strip()
-
-    skill = skill.replace("_", " ")
-
-    skill = skill.replace("-", " ")
-
-    skill = re.sub(
-        r"\s+",
-        " ",
-        skill
-    )
-
-    return skill.strip()
-
-
-# =====================================================
-# EXTRACT REQUIRED SKILLS
-# =====================================================
-
-def extract_required_skills(skill_text):
-
-    if pd.isna(skill_text):
-
-        return set()
-
-
-    text = str(skill_text).strip()
-
-
-    if not text:
-
-        return set()
-
-
-    # -------------------------------------------------
-    # Dataset list format
-    # Example:
-    # ['Python', 'SQL', 'Pandas']
-    # -------------------------------------------------
-
-    try:
-
-        parsed = ast.literal_eval(text)
-
-
-        if isinstance(parsed, (list, tuple, set)):
-
-            skills = set()
-
-            for skill in parsed:
-
-                cleaned = clean_skill(skill)
-
-                if cleaned:
-
-                    skills.add(cleaned)
-
-            return skills
-
-
-    except (ValueError, SyntaxError):
-
-        pass
-
-
-    # -------------------------------------------------
-    # Normal text format
-    # -------------------------------------------------
-
-    text = text.replace(
-        ",",
-        "|"
-    )
-
-    text = text.replace(
-        ";",
-        "|"
-    )
-
-    text = text.replace(
-        "/",
-        "|"
-    )
-
-    skills = text.split("|")
-
-
-    result = set()
-
-
-    for skill in skills:
-
-        cleaned = clean_skill(skill)
-
-        if cleaned:
-
-            result.add(cleaned)
-
-
-    return result
-
-
-# =====================================================
-# EXTRACT USER SKILLS
-# =====================================================
-
-def extract_user_skills(user_text):
-
-    if not user_text:
-
-        return set()
-
-
-    if not user_text.strip():
-
-        return set()
-
-
-    skills = user_text.split(",")
-
-
-    result = set()
-
-
-    for skill in skills:
-
-        cleaned = clean_skill(skill)
-
-        if cleaned:
-
-            result.add(cleaned)
-
-
-    return result
-
-
-# =====================================================
-# RESUME UPLOAD + NLP SKILL EXTRACTION
-# =====================================================
-
-def extract_resume_text(uploaded_file):
-    """Extract readable text from PDF, DOCX or TXT resume files."""
-    if uploaded_file is None:
-        return ""
-
-    try:
-        file_name = uploaded_file.name.lower()
-
-        if file_name.endswith(".pdf"):
-            if PdfReader is None:
-                return ""
-
-            reader = PdfReader(uploaded_file)
-            pages = []
-
-            for page in reader.pages:
-                page_text = page.extract_text() or ""
-                pages.append(page_text)
-
-            return "\n".join(pages).strip()
-
-        if file_name.endswith(".docx"):
-            if Document is None:
-                return ""
-
-            document = Document(uploaded_file)
-            return "\n".join(
-                paragraph.text
-                for paragraph in document.paragraphs
-                if paragraph.text.strip()
-            ).strip()
-
-        if file_name.endswith(".txt"):
-            return uploaded_file.getvalue().decode(
-                "utf-8", errors="ignore"
-            ).strip()
-
-    except Exception:
-        return ""
-
-    return ""
-
-
-def extract_skills_from_resume(resume_text, dataframe):
-    """
-    Identify skills appearing in the resume from the existing dataset
-    skill vocabulary. The dataset itself is never modified.
-    """
-    if not resume_text:
-        return set()
-
-    normalized_resume = re.sub(
-        r"\s+",
-        " ",
-        resume_text.lower()
-    )
-
-    dataset_skills = set()
-
-    for value in dataframe["job_skill_set"].dropna().astype(str):
-        dataset_skills.update(
-            extract_required_skills(value)
-        )
-
-    found_skills = set()
-
-    for skill in dataset_skills:
-        skill_clean = clean_skill(skill)
-
-        if not skill_clean:
-            continue
-
-        # Match the complete skill phrase while allowing punctuation such
-        # as C#, .NET, C++, etc. to remain searchable.
-        skill_pattern = re.escape(skill_clean)
-
-        if re.search(
-            rf"(?<![a-z0-9]){skill_pattern}(?![a-z0-9])",
-            normalized_resume
-        ):
-            found_skills.add(skill_clean)
-
-    return found_skills
-
-
-# =====================================================
-# AI / NLP SEMANTIC MATCHING
-# =====================================================
-
-@st.cache_resource(show_spinner=False)
-def load_ai_model():
-    """Load the pretrained Sentence Transformer model once."""
-    if not AI_MODEL_AVAILABLE:
-        return None
-
-    return SentenceTransformer("all-MiniLM-L6-v2")
-
-
-def build_job_ai_text(row):
-    """Create the text representation used by the NLP model."""
-    title = str(row.get("job_title", ""))
-    description = str(row.get("job_description", ""))
-    skills = str(row.get("job_skill_set", ""))
-
-    return (
-        f"Job title: {title}. "
-        f"Required skills: {skills}. "
-        f"Job description: {description}"
-    )
-
-
-def calculate_ai_semantic_scores(user_profile, job_rows):
-    """
-    Calculate semantic similarity between the user's profile and
-    each job using a pretrained Sentence Transformer model.
-    Returns percentages from 0 to 100.
-    """
-    if not AI_MODEL_AVAILABLE or not job_rows:
-        return [0.0] * len(job_rows), False
-
-    try:
-        model = load_ai_model()
-
-        job_texts = [
-            build_job_ai_text(row)
-            for row in job_rows
-        ]
-
-        embeddings = model.encode(
-            [user_profile] + job_texts,
-            normalize_embeddings=True,
-            show_progress_bar=False
-        )
-
-        user_embedding = embeddings[0]
-        job_embeddings = embeddings[1:]
-
-        similarities = np.dot(
-            job_embeddings,
-            user_embedding
-        )
-
-        scores = []
-
-        for similarity in similarities:
-            # Cosine similarity is converted into a readable percentage.
-            # Negative values are safely clipped because this app uses
-            # similarity as a relevance indicator.
-            score = float(np.clip(similarity, 0.0, 1.0) * 100)
-            scores.append(round(score, 2))
-
-        return scores, True
-
-    except Exception:
-        # The original recommendation system remains available if the
-        # pretrained model cannot be loaded (for example, temporarily
-        # unavailable model download/network).
-        return [0.0] * len(job_rows), False
-
-
-# =====================================================
-# POSITION SIMILARITY
-# =====================================================
-
-def calculate_position_similarity(
-    user_position,
-    job_position
-):
-
-    user_position = clean_skill(
-        user_position
-    )
-
-    job_position = clean_skill(
-        job_position
-    )
-
-
-    # -------------------------------------------------
-    # Exact position
-    # -------------------------------------------------
-
-    if user_position == job_position:
-
-        return 100.0
-
-
-    user_words = set(
-        user_position.split()
-    )
-
-
-    job_words = set(
-        job_position.split()
-    )
-
-
-    if not user_words or not job_words:
-
-        return 0.0
-
-
-    common_words = (
-        user_words
-        .intersection(job_words)
-    )
-
-
-    if not common_words:
-
-        return 0.0
-
-
-    # -------------------------------------------------
-    # Position similarity
-    # -------------------------------------------------
-    #
-    # Use Jaccard-style word similarity.
-    #
-    # Example:
-    #
-    # Business Development Manager
-    # Business Development Executive
-    #
-    # Common:
-    # Business, Development
-    #
-    # -------------------------------------------------
-
-    union_words = (
-        user_words
-        .union(job_words)
-    )
-
-
-    similarity = (
-        len(common_words)
-        /
-        len(union_words)
-    ) * 100
-
-
-    return round(
-        min(similarity, 100.0),
-        2
-    )
-
-
-# =====================================================
-# CORRECT SKILL MATCH SCORE
-# =====================================================
-
-def calculate_skill_score(
-    user_skill_set,
-    required_skill_set
-):
-
-    if not user_skill_set:
-
-        return 0.0, 0.0, 0.0, set()
-
-
-    if not required_skill_set:
-
-        return 0.0, 0.0, 0.0, set()
-
-
-    # -------------------------------------------------
-    # DIRECT SKILL INTERSECTION
-    # -------------------------------------------------
-
-    matched_skills = (
-        user_skill_set
-        .intersection(
-            required_skill_set
-        )
-    )
-
-
-    matched_count = len(
-        matched_skills
-    )
-
-
-    # -------------------------------------------------
-    # PRECISION
-    #
-    # Of user's entered skills,
-    # how many are relevant to this job?
-    #
-    # -------------------------------------------------
-
-    precision = (
-        matched_count
-        /
-        len(user_skill_set)
-    )
-
-
-    # -------------------------------------------------
-    # RECALL
-    #
-    # Of job's required skills,
-    # how many does the user have?
-    #
-    # -------------------------------------------------
-
-    recall = (
-        matched_count
-        /
-        len(required_skill_set)
-    )
-
-
-    # -------------------------------------------------
-    # F1-STYLE BALANCED SCORE
-    #
-    # This prevents one side from artificially
-    # increasing the percentage.
-    #
-    # -------------------------------------------------
-
-    if (
-        precision + recall
-    ) == 0:
-
-        f1_score = 0.0
-
-    else:
-
-        f1_score = (
-            2
-            * precision
-            * recall
-            /
-            (precision + recall)
-        )
-
-
-    skill_percentage = (
-        f1_score * 100
-    )
-
-
-    precision_percentage = (
-        precision * 100
-    )
-
-
-    recall_percentage = (
-        recall * 100
-    )
-
-
-    return (
-        round(skill_percentage, 2),
-        round(precision_percentage, 2),
-        round(recall_percentage, 2),
-        matched_skills
-    )
-
-
-# =====================================================
-# JOB RECOMMENDATION FUNCTION
-# =====================================================
-
-def get_recommendations(
-    category,
-    job_title,
-    user_skills
-):
-
-    # -------------------------------------------------
-    # FILTER CATEGORY
-    # -------------------------------------------------
-
-    category_data = df[
-        df["category"] == category
-    ].copy()
-
-    if category_data.empty:
-        return category_data
-
-    # -------------------------------------------------
-    # USER SKILLS
-    # -------------------------------------------------
-
-    user_skill_set = extract_user_skills(user_skills)
-
-    if not user_skill_set:
-        return category_data.iloc[0:0]
-
-    # -------------------------------------------------
-    # AI USER PROFILE
-    # -------------------------------------------------
-    # The pretrained NLP model understands the meaning/context of
-    # the user's skills and the job information instead of relying
-    # only on exact word matching.
-
-    user_profile = (
-        f"Desired job position: {job_title}. "
-        f"Career category: {category}. "
-        f"Candidate skills: {', '.join(sorted(user_skill_set))}."
-    )
-
-    category_rows = [
-        row
-        for _, row in category_data.iterrows()
-    ]
-
-    ai_scores, ai_used = calculate_ai_semantic_scores(
-        user_profile,
-        category_rows
-    )
-
-    results = []
-
-    # -------------------------------------------------
-    # PROCESS EVERY JOB IN CATEGORY
-    # -------------------------------------------------
-
-    for row_position, (index, row) in enumerate(
-        category_data.iterrows()
-    ):
-
-        required_skills = extract_required_skills(
-            row["job_skill_set"]
-        )
-
-        if not required_skills:
-            continue
-
-        # -------------------------------------------------
-        # EXISTING DIRECT SKILL SCORE
-        # -------------------------------------------------
-
-        (
-            skill_score,
-            precision_percentage,
-            recall_percentage,
-            matched_skills
-        ) = calculate_skill_score(
-            user_skill_set,
-            required_skills
-        )
-
-        # -------------------------------------------------
-        # EXISTING POSITION SCORE
-        # -------------------------------------------------
-
-        position_score = calculate_position_similarity(
-            job_title,
-            row["job_title"]
-        )
-
-        # -------------------------------------------------
-        # NEW AI SEMANTIC SCORE
-        # -------------------------------------------------
-
-        ai_semantic_score = (
-            ai_scores[row_position]
-            if ai_used
-            else 0.0
-        )
-
-        # -------------------------------------------------
-        # AI-ENHANCED FINAL SCORE
-        #
-        # Direct skills      = 70%
-        # AI semantic match  = 20%
-        # Position relevance = 10%
-        # -------------------------------------------------
-
-        if ai_used:
-            final_score = (
-                skill_score * 0.70
-                + ai_semantic_score * 0.20
-                + position_score * 0.10
-            )
-        else:
-            # Preserve the previous system when AI is unavailable.
-            final_score = (
-                skill_score * 0.85
-                + position_score * 0.15
-            )
-
-        # -------------------------------------------------
-        # LOW-INPUT SAFETY RULE
-        #
-        # With only 1–2 entered skills, the recommendation should
-        # remain below 30%, even when semantic similarity is high.
-        # This prevents a small input from producing an inflated
-        # recommendation percentage.
-        # -------------------------------------------------
-
-        if len(user_skill_set) <= 2:
-            final_score = min(final_score, 29.9)
-
-        # Keep 100% out of the displayed recommendation scale.
-        final_score = max(0.0, min(final_score, 99.0))
-
-        results.append(
-            {
-                "index": index,
-                "match_percentage": round(final_score, 2),
-                "matched_skills": matched_skills,
-                "skill_score": skill_score,
-                "precision_percentage": precision_percentage,
-                "recall_percentage": recall_percentage,
-                "position_relevance": position_score,
-                "ai_semantic_score": round(ai_semantic_score, 2),
-                "ai_enabled": ai_used,
-                "required_skill_count": len(required_skills),
-                "matched_skill_count": len(matched_skills),
-                "missing_skills": required_skills.difference(matched_skills)
-            }
-        )
-
-    if not results:
-        return category_data.iloc[0:0]
-
-    result_df = pd.DataFrame(results)
-
-    recommendations = category_data.merge(
-        result_df,
-        left_index=True,
-        right_on="index"
-    )
-
-    recommendations = (
-        recommendations
-        .sort_values(
-            by=[
-                "match_percentage",
-                "skill_score",
-                "ai_semantic_score",
-                "position_relevance"
-            ],
-            ascending=False
-        )
-        .head(5)
-    )
-
-    return recommendations
-
-
-# =====================================================
-# ADVANCED FEATURE — EXPLAINABLE RECOMMENDATION
-# =====================================================
-
-def get_recommendation_explanation(row):
-    matched_count = int(row["matched_skill_count"])
-    required_count = int(row["required_skill_count"])
-    skill_score = float(row["skill_score"])
-    position_score = float(row["position_relevance"])
-    ai_score = float(row.get("ai_semantic_score", 0.0))
-
-    if matched_count == 0:
-        skill_reason = "No direct required-skill match was found."
-    else:
-        skill_reason = (
-            f"{matched_count} of {required_count} required skills "
-            "match your entered skills."
-        )
-
-    if position_score >= 80:
-        position_reason = "The selected position is highly relevant to this role."
-    elif position_score > 0:
-        position_reason = "The selected position has some relevance to this role."
-    else:
-        position_reason = "The selected position has no direct word-level match."
-
-    return (
-        f"{skill_reason} {position_reason} "
-        f"Direct skill matching contributes {skill_score:.1f}%, "
-        f"AI semantic similarity is {ai_score:.1f}%, and "
-        f"position relevance is {position_score:.1f}%."
-    )
-
-
-def format_skill_list(skills):
-    if not skills:
-        return "None"
-    return ", ".join(sorted(skills))
 
 
 # =====================================================
 # FIND JOBS
 # =====================================================
+st.divider()
+find_button = st.button("🚀 Find Top 5 AI Job Recommendations", use_container_width=True)
 
-st.subheader(
-    "🎯 Find Your Jobs"
-)
+if find_button:
+    if not combined_skills:
+        st.warning("Please enter at least one skill manually or upload a resume containing relevant skills.")
+        st.stop()
 
+    with st.spinner("Analyzing skills and matching jobs..."):
+        recommendations, ai_available = get_recommendations(
+            category,
+            job_title,
+            combined_skills,
+            len(manual_skill_set),
+            use_ai=use_ai
+        )
 
-st.write(
-    "Get the top 5 jobs that best match your "
-    "category, position and skills."
-)
-
-
-st.info(
-    f"🔎 **Category:** {category}  |  "
-    f"**Position:** {job_title}"
-)
-
-
-if st.button(
-    "🚀 FIND MY TOP 5 JOBS",
-    use_container_width=True
-):
-
-
-    # -------------------------------------------------
-    # CHECK SKILLS
-    # -------------------------------------------------
-
-    if not user_skills.strip():
-
+    if use_ai and not ai_available:
         st.warning(
-            "⚠️ Please enter your skills first."
+            "NLP model is not available. Showing the existing skill-based recommendation logic. "
+            "Install the packages from requirements.txt and restart the app to enable semantic matching."
         )
 
+    if recommendations.empty:
+        st.error("No suitable recommendations could be generated for the selected input.")
+        st.stop()
 
-    else:
+    st.subheader("🏆 Top 5 Job Recommendations")
+    st.caption("Recommendations combine direct skill matching, NLP semantic similarity and position relevance when AI mode is available.")
 
-        recommendations = (
-            get_recommendations(
-                category,
-                job_title,
-                user_skills
-            )
+    for number, (_, row) in enumerate(recommendations.iterrows(), start=1):
+        match_percentage = float(row["match_percentage"])
+        matched = row["matched_skills"]
+        missing = row["missing_skills"]
+        matched_text = ", ".join(sorted(s.title() for s in matched)) if matched else "None"
+        missing_text = ", ".join(sorted(s.title() for s in missing)) if missing else "None"
+
+        st.markdown(
+            f"""
+            <div class='job-card'>
+                <div class='job-title'>{number}. 💼 {row['job_title']}</div>
+                <br>
+                <div class='match-score'>🎯 AI Match: {match_percentage:.2f}%</div>
+                <br>
+                📂 <b>Category:</b> {row['category']}<br><br>
+                🆔 <b>Job ID:</b> {row['job_id']}<br><br>
+                ✅ <b>Matching Skills:</b> {matched_text}<br><br>
+                ⚠️ <b>Missing Skills:</b> {missing_text}<br><br>
+                🛠️ <b>Required Skills:</b> {row['job_skill_set']}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
+        st.progress(int(max(0, min(100, round(match_percentage)))))
 
-        # -------------------------------------------------
-        # NO RESULTS
-        # -------------------------------------------------
+        with st.expander(f"📄 View Full Details - Job {number}"):
+            st.markdown("### 📝 Job Description")
+            st.write(row["job_description"])
 
-        if recommendations.empty:
+            st.markdown("### 📊 Match Score Breakdown")
+            b1, b2, b3 = st.columns(3)
+            b1.metric("Exact Skill Match", f"{row['skill_score']:.1f}%")
+            b2.metric("NLP Semantic Match", f"{row['semantic_score']:.1f}%")
+            b3.metric("Position Relevance", f"{row['position_relevance']:.1f}%")
 
-            st.warning(
-                "😔 No suitable jobs found."
+            st.write(
+                f"**Matched skills:** {row['matched_skill_count']} / {row['required_skill_count']} required skills"
             )
+            st.write(f"**Matching skills:** {matched_text}")
 
-            st.info(
-                "💡 Try entering more relevant skills."
-            )
-
-
-        else:
-
-            st.success(
-                "🎉 Top 5 matching jobs generated!"
-            )
-
-            if bool(recommendations.iloc[0]["ai_enabled"]):
+            st.markdown("### 🔍 Skill Gap Analysis")
+            if missing:
                 st.markdown(
-                    """
-                    <div class="ai-card">
-                    <b>🤖 AI/NLP Semantic Matching Active</b><br>
-                    The system uses a pretrained Sentence Transformer model to
-                    understand semantic similarity between your skills/profile
-                    and job titles, required skills and job descriptions.
-                    </div>
-                    """,
+                    f"<div class='gap-card'><b>Skills to develop for this role:</b><br><br>{display_skill_tags(missing, missing=True)}</div>",
                     unsafe_allow_html=True
                 )
+
+                st.markdown("### 📚 Learning Recommendations")
+                st.caption("Search for beginner-friendly tutorials and full courses for the missing skills.")
+                for skill in sorted(missing):
+                    url = youtube_search_url(skill)
+                    st.markdown(f"▶️ **{skill.title()}** — [Learn on YouTube]({url})")
             else:
-                st.warning(
-                    "AI model could not be loaded, so the original matching logic "
-                    "is being used for this search."
-                )
-
-            st.subheader(
-                "🏆 Your Best Job Recommendations"
-            )
-
-
-            st.caption(
-                "The percentage combines direct skill matching, AI/NLP semantic similarity, "
-                "and selected-position relevance."
-            )
-
-
-            # =================================================
-            # DISPLAY TOP 5
-            # =================================================
-
-            for number, (_, row) in enumerate(
-                recommendations.iterrows(),
-                start=1
-            ):
-
-
-                match_percentage = round(
-                    float(
-                        row["match_percentage"]
-                    ),
-                    1
-                )
-
-
-                matched_skills = (
-                    row["matched_skills"]
-                )
-
-
-                # -------------------------------------------------
-                # MATCHED SKILLS TEXT
-                # -------------------------------------------------
-
-                if isinstance(
-                    matched_skills,
-                    set
-                ):
-
-                    if matched_skills:
-
-                        matched_skills_text = (
-                            ", ".join(
-                                sorted(
-                                    matched_skills
-                                )
-                            )
-                        )
-
-                    else:
-
-                        matched_skills_text = (
-                            "No direct skill match"
-                        )
-
-                else:
-
-                    matched_skills_text = str(
-                        matched_skills
-                    )
-
-
-                # -------------------------------------------------
-                # JOB CARD
-                # -------------------------------------------------
-
-                st.markdown(
-                    f"""
-                    <div class="job-card">
-
-                    <div class="job-title">
-
-                    {number}. 💼 {row["job_title"]}
-
-                    </div>
-
-                    <br>
-
-                    <div class="match-score">
-
-                    🎯 Best Match: {match_percentage}%
-
-                    </div>
-
-                    <br>
-
-                    📂 <b>Category:</b>
-                    {row["category"]}
-
-                    <br><br>
-
-                    🆔 <b>Job ID:</b>
-                    {row["job_id"]}
-
-                    <br><br>
-
-                    ✅ <b>Matching Skills:</b>
-                    {matched_skills_text}
-
-                    <br><br>
-
-                    🛠️ <b>Required Skills:</b>
-
-                    <br><br>
-
-                    {row["job_skill_set"]}
-
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-
-                # -------------------------------------------------
-                # MATCH PROGRESS
-                # -------------------------------------------------
-
-                st.progress(
-                    int(
-                        min(
-                            max(
-                                match_percentage,
-                                0
-                            ),
-                            100
-                        )
-                    )
-                )
-
-
-                # -------------------------------------------------
-                # FULL DETAILS
-                # -------------------------------------------------
-
-                with st.expander(
-                    f"📄 View Full Details - Job {number}"
-                ):
-
-                    st.markdown(
-                        "### 📝 Job Description"
-                    )
-
-                    st.write(
-                        row["job_description"]
-                    )
-
-
-                    st.markdown(
-                        "### 🛠️ Required Skills"
-                    )
-
-                    st.write(
-                        row["job_skill_set"]
-                    )
-
-
-                    st.markdown(
-                        "### 🎯 Match Details"
-                    )
-
-                    st.write(
-                        f"**Final Match:** "
-                        f"{match_percentage}%"
-                    )
-
-
-                    st.write(
-                        f"**Skill Match:** "
-                        f"{row['skill_score']:.1f}%"
-                    )
-
-
-                    st.write(
-                        f"**Position Match:** "
-                        f"{row['position_relevance']:.1f}%"
-                    )
-
-
-                    st.write(
-                        f"**🤖 AI Semantic Match:** "
-                        f"{row['ai_semantic_score']:.1f}%"
-                    )
-
-
-                    st.write(
-                        f"**Matched Skills:** "
-                        f"{row['matched_skill_count']} "
-                        f"out of "
-                        f"{row['required_skill_count']} "
-                        f"required skills"
-                    )
-
-
-                    st.write(
-                        f"**Matching Skills:** "
-                        f"{matched_skills_text}"
-                    )
-
-                    st.markdown("#### 💡 Why This Job Is Recommended")
-                    st.info(get_recommendation_explanation(row))
-
-                    st.markdown("#### 🧩 Skill Gap Analysis")
-
-                    missing_skills = row.get(
-                        "missing_skills",
-                        set()
-                    )
-
-                    if not isinstance(missing_skills, set):
-                        missing_skills = set()
-
-                    gap_col1, gap_col2 = st.columns(2)
-
-                    with gap_col1:
-                        st.success(
-                            f"✅ Matched Skills: "
-                            f"{row['matched_skill_count']}"
-                        )
-
-                    with gap_col2:
-                        st.warning(
-                            f"📚 Skills to Develop: "
-                            f"{len(missing_skills)}"
-                        )
-
-                    if missing_skills:
-                        missing_skills_text = format_skill_list(
-                            missing_skills
-                        )
-
-                        st.markdown(
-                            f"""
-                            <div class="gap-card">
-                            <b>📚 Recommended Skills to Develop</b>
-                            <br><br>
-                            {missing_skills_text}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                        st.caption(
-                            "Developing these missing skills can improve "
-                            "your suitability for this job role."
-                        )
-                    else:
-                        st.success(
-                            "🎉 You have a direct match with all "
-                            "required skills listed for this job."
-                        )
-
-
-                    st.info(
-                        "The final percentage uses direct skill matching, AI/NLP semantic similarity, "
-                        "and selected-position relevance."
-                    )
+                st.success("🎉 No missing skills were identified for this job's listed skill set.")
+
+            st.markdown("### 🛠️ Required Skills")
+            st.write(row["job_skill_set"])
+
+
+# =====================================================
+# AI FEATURE INFORMATION
+# =====================================================
+st.divider()
+st.subheader("🤖 AI Features in CareerMatch AI")
+info_cols = st.columns(4)
+features = [
+    ("📄", "Resume Skill Extraction", "Reads PDF/DOCX/TXT resumes and identifies skills present in the project dataset."),
+    ("🧠", "NLP Semantic Matching", "Uses a pretrained sentence-transformer to compare the candidate profile with job text."),
+    ("🔍", "Skill Gap Analysis", "Shows required skills that are not present in the candidate skill profile."),
+    ("▶️", "YouTube Learning Links", "Creates YouTube tutorial searches for missing skills to support learning."),
+]
+for col, (icon, title, desc) in zip(info_cols, features):
+    with col:
+        st.markdown(
+            f"<div class='feature-card'><h3>{icon} {title}</h3><p>{desc}</p></div>",
+            unsafe_allow_html=True
+        )
 
 
 # =====================================================
 # FOOTER
 # =====================================================
-
 st.markdown("---")
-
-
 st.markdown(
     """
-    <div class="footer">
-
-    <b>💼 CareerMatch AI</b>
-
-    <br>
-
-    Smart Job Recommendation System
-
-    <br><br>
-
-    Built with Python • Pandas • Streamlit
-
-    </div>
-    """,
+<div class='footer'>
+<b>💼 CareerMatch AI</b><br>
+AI-Assisted Smart Job Recommendation System<br><br>
+Built with Python • Pandas • Streamlit • NLP • Sentence Transformers
+</div>
+""",
     unsafe_allow_html=True
 )
-
