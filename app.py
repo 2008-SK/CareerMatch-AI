@@ -5,6 +5,14 @@ import json
 import os
 import hashlib
 import ast
+import numpy as np
+
+try:
+    from sentence_transformers import SentenceTransformer
+    AI_MODEL_AVAILABLE = True
+except ImportError:
+    SentenceTransformer = None
+    AI_MODEL_AVAILABLE = False
 
 
 # =====================================================
@@ -450,6 +458,14 @@ div[data-testid="stExpander"] {
     border: 1px solid rgba(128,128,128,0.22);
     background: rgba(128,128,128,0.035);
     margin-top: 10px;
+}
+
+.ai-card {
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(128,128,128,0.25);
+    background: rgba(128,128,128,0.035);
+    margin: 12px 0;
 }
 
 .insight-card {
@@ -902,6 +918,81 @@ def extract_user_skills(user_text):
 
 
 # =====================================================
+# AI / NLP SEMANTIC MATCHING
+# =====================================================
+
+@st.cache_resource(show_spinner=False)
+def load_ai_model():
+    """Load the pretrained Sentence Transformer model once."""
+    if not AI_MODEL_AVAILABLE:
+        return None
+
+    return SentenceTransformer("all-MiniLM-L6-v2")
+
+
+def build_job_ai_text(row):
+    """Create the text representation used by the NLP model."""
+    title = str(row.get("job_title", ""))
+    description = str(row.get("job_description", ""))
+    skills = str(row.get("job_skill_set", ""))
+
+    return (
+        f"Job title: {title}. "
+        f"Required skills: {skills}. "
+        f"Job description: {description}"
+    )
+
+
+def calculate_ai_semantic_scores(user_profile, job_rows):
+    """
+    Calculate semantic similarity between the user's profile and
+    each job using a pretrained Sentence Transformer model.
+    Returns percentages from 0 to 100.
+    """
+    if not AI_MODEL_AVAILABLE or not job_rows:
+        return [0.0] * len(job_rows), False
+
+    try:
+        model = load_ai_model()
+
+        job_texts = [
+            build_job_ai_text(row)
+            for row in job_rows
+        ]
+
+        embeddings = model.encode(
+            [user_profile] + job_texts,
+            normalize_embeddings=True,
+            show_progress_bar=False
+        )
+
+        user_embedding = embeddings[0]
+        job_embeddings = embeddings[1:]
+
+        similarities = np.dot(
+            job_embeddings,
+            user_embedding
+        )
+
+        scores = []
+
+        for similarity in similarities:
+            # Cosine similarity is converted into a readable percentage.
+            # Negative values are safely clipped because this app uses
+            # similarity as a relevance indicator.
+            score = float(np.clip(similarity, 0.0, 1.0) * 100)
+            scores.append(round(score, 2))
+
+        return scores, True
+
+    except Exception:
+        # The original recommendation system remains available if the
+        # pretrained model cannot be loaded (for example, temporarily
+        # unavailable model download/network).
+        return [0.0] * len(job_rows), False
+
+
+# =====================================================
 # POSITION SIMILARITY
 # =====================================================
 
@@ -1121,51 +1212,60 @@ def get_recommendations(
         df["category"] == category
     ].copy()
 
-
     if category_data.empty:
-
         return category_data
-
 
     # -------------------------------------------------
     # USER SKILLS
     # -------------------------------------------------
 
-    user_skill_set = (
-        extract_user_skills(
-            user_skills
-        )
-    )
-
+    user_skill_set = extract_user_skills(user_skills)
 
     if not user_skill_set:
-
         return category_data.iloc[0:0]
 
+    # -------------------------------------------------
+    # AI USER PROFILE
+    # -------------------------------------------------
+    # The pretrained NLP model understands the meaning/context of
+    # the user's skills and the job information instead of relying
+    # only on exact word matching.
+
+    user_profile = (
+        f"Desired job position: {job_title}. "
+        f"Career category: {category}. "
+        f"Candidate skills: {', '.join(sorted(user_skill_set))}."
+    )
+
+    category_rows = [
+        row
+        for _, row in category_data.iterrows()
+    ]
+
+    ai_scores, ai_used = calculate_ai_semantic_scores(
+        user_profile,
+        category_rows
+    )
 
     results = []
-
 
     # -------------------------------------------------
     # PROCESS EVERY JOB IN CATEGORY
     # -------------------------------------------------
 
-    for index, row in category_data.iterrows():
+    for row_position, (index, row) in enumerate(
+        category_data.iterrows()
+    ):
 
-        required_skills = (
-            extract_required_skills(
-                row["job_skill_set"]
-            )
+        required_skills = extract_required_skills(
+            row["job_skill_set"]
         )
 
-
         if not required_skills:
-
             continue
 
-
         # -------------------------------------------------
-        # SKILL SCORE
+        # EXISTING DIRECT SKILL SCORE
         # -------------------------------------------------
 
         (
@@ -1178,101 +1278,82 @@ def get_recommendations(
             required_skills
         )
 
-
         # -------------------------------------------------
-        # POSITION SCORE
+        # EXISTING POSITION SCORE
         # -------------------------------------------------
 
-        position_score = (
-            calculate_position_similarity(
-                job_title,
-                row["job_title"]
-            )
+        position_score = calculate_position_similarity(
+            job_title,
+            row["job_title"]
         )
 
+        # -------------------------------------------------
+        # NEW AI SEMANTIC SCORE
+        # -------------------------------------------------
+
+        ai_semantic_score = (
+            ai_scores[row_position]
+            if ai_used
+            else 0.0
+        )
 
         # -------------------------------------------------
-        # FINAL SCORE
+        # AI-ENHANCED FINAL SCORE
         #
-        # Skills     = 85%
-        # Position   = 15%
-        #
+        # Direct skills      = 70%
+        # AI semantic match  = 20%
+        # Position relevance = 10%
         # -------------------------------------------------
 
-        final_score = (
-            skill_score * 0.85
-            +
-            position_score * 0.15
-        )
-
-
-        # -------------------------------------------------
-        # SAFETY LIMIT
-        # -------------------------------------------------
-
-        final_score = max(
-            0.0,
-            min(
-                final_score,
-                100.0
+        if ai_used:
+            final_score = (
+                skill_score * 0.70
+                + ai_semantic_score * 0.20
+                + position_score * 0.10
             )
-        )
+        else:
+            # Preserve the previous system when AI is unavailable.
+            final_score = (
+                skill_score * 0.85
+                + position_score * 0.15
+            )
 
+        # -------------------------------------------------
+        # LOW-INPUT SAFETY RULE
+        #
+        # With only 1–2 entered skills, the recommendation should
+        # remain below 30%, even when semantic similarity is high.
+        # This prevents a small input from producing an inflated
+        # recommendation percentage.
+        # -------------------------------------------------
+
+        if len(user_skill_set) <= 2:
+            final_score = min(final_score, 29.9)
+
+        # Keep 100% out of the displayed recommendation scale.
+        final_score = max(0.0, min(final_score, 99.0))
 
         results.append(
             {
                 "index": index,
-
-                "match_percentage":
-                    round(
-                        final_score,
-                        2
-                    ),
-
-                "matched_skills":
-                    matched_skills,
-
-                "skill_score":
-                    skill_score,
-
-                "precision_percentage":
-                    precision_percentage,
-
-                "recall_percentage":
-                    recall_percentage,
-
-                "position_relevance":
-                    position_score,
-
-                "required_skill_count":
-                    len(required_skills),
-
-                "matched_skill_count":
-                    len(matched_skills),
-
-                "missing_skills":
-                    required_skills.difference(matched_skills)
+                "match_percentage": round(final_score, 2),
+                "matched_skills": matched_skills,
+                "skill_score": skill_score,
+                "precision_percentage": precision_percentage,
+                "recall_percentage": recall_percentage,
+                "position_relevance": position_score,
+                "ai_semantic_score": round(ai_semantic_score, 2),
+                "ai_enabled": ai_used,
+                "required_skill_count": len(required_skills),
+                "matched_skill_count": len(matched_skills),
+                "missing_skills": required_skills.difference(matched_skills)
             }
         )
 
-
-    # -------------------------------------------------
-    # NO RESULTS
-    # -------------------------------------------------
-
     if not results:
-
         return category_data.iloc[0:0]
 
-
-    result_df = pd.DataFrame(
-        results
-    )
-
-
-    # -------------------------------------------------
-    # MERGE ORIGINAL DATA
-    # -------------------------------------------------
+    result_df = pd.DataFrame(results)
 
     recommendations = category_data.merge(
         result_df,
@@ -1280,24 +1361,19 @@ def get_recommendations(
         right_on="index"
     )
 
-
-    # -------------------------------------------------
-    # SORT
-    # -------------------------------------------------
-
     recommendations = (
         recommendations
         .sort_values(
             by=[
                 "match_percentage",
                 "skill_score",
+                "ai_semantic_score",
                 "position_relevance"
             ],
             ascending=False
         )
         .head(5)
     )
-
 
     return recommendations
 
@@ -1311,6 +1387,7 @@ def get_recommendation_explanation(row):
     required_count = int(row["required_skill_count"])
     skill_score = float(row["skill_score"])
     position_score = float(row["position_relevance"])
+    ai_score = float(row.get("ai_semantic_score", 0.0))
 
     if matched_count == 0:
         skill_reason = "No direct required-skill match was found."
@@ -1329,9 +1406,9 @@ def get_recommendation_explanation(row):
 
     return (
         f"{skill_reason} {position_reason} "
-        f"Skill matching contributes {skill_score:.1f}% and "
-        f"position relevance contributes {position_score:.1f}% "
-        "to the final recommendation."
+        f"Direct skill matching contributes {skill_score:.1f}%, "
+        f"AI semantic similarity is {ai_score:.1f}%, and "
+        f"position relevance is {position_score:.1f}%."
     )
 
 
@@ -1411,6 +1488,23 @@ if st.button(
                 "🎉 Top 5 matching jobs generated!"
             )
 
+            if bool(recommendations.iloc[0]["ai_enabled"]):
+                st.markdown(
+                    """
+                    <div class="ai-card">
+                    <b>🤖 AI/NLP Semantic Matching Active</b><br>
+                    The system uses a pretrained Sentence Transformer model to
+                    understand semantic similarity between your skills/profile
+                    and job titles, required skills and job descriptions.
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.warning(
+                    "AI model could not be loaded, so the original matching logic "
+                    "is being used for this search."
+                )
 
             st.subheader(
                 "🏆 Your Best Job Recommendations"
@@ -1418,9 +1512,8 @@ if st.button(
 
 
             st.caption(
-                "The percentage represents the "
-                "combined relevance of your skills "
-                "and selected job position."
+                "The percentage combines direct skill matching, AI/NLP semantic similarity, "
+                "and selected-position relevance."
             )
 
 
@@ -1596,6 +1689,12 @@ if st.button(
 
 
                     st.write(
+                        f"**🤖 AI Semantic Match:** "
+                        f"{row['ai_semantic_score']:.1f}%"
+                    )
+
+
+                    st.write(
                         f"**Matched Skills:** "
                         f"{row['matched_skill_count']} "
                         f"out of "
@@ -1664,9 +1763,8 @@ if st.button(
 
 
                     st.info(
-                        "The final percentage is calculated "
-                        "using balanced skill matching and "
-                        "selected-position relevance."
+                        "The final percentage uses direct skill matching, AI/NLP semantic similarity, "
+                        "and selected-position relevance."
                     )
 
 
