@@ -8,6 +8,16 @@ import ast
 import numpy as np
 
 try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
+
+try:
+    from docx import Document
+except ImportError:
+    Document = None
+
+try:
     from sentence_transformers import SentenceTransformer
     AI_MODEL_AVAILABLE = True
 except ImportError:
@@ -664,21 +674,80 @@ job_title = st.selectbox(
 # =====================================================
 
 st.markdown(
-    "### 3️⃣ Enter Your Skills"
+    "### 3️⃣ Add Your Skills or Upload Resume"
 )
+
+resume_file = st.file_uploader(
+    "📄 Upload Resume",
+    type=["pdf", "docx", "txt"],
+    help="Upload your resume in PDF, DOCX or TXT format. The system extracts relevant skills and uses them for job matching."
+)
+
+resume_text = ""
+resume_skills = set()
+
+if resume_file is not None:
+
+    resume_text = extract_resume_text(resume_file)
+
+    if resume_text:
+        resume_skills = extract_skills_from_resume(
+            resume_text,
+            df
+        )
+
+        st.success(
+            f"📄 Resume processed successfully. "
+            f"{len(resume_skills)} relevant skills identified."
+        )
+
+        if resume_skills:
+            st.markdown("**🤖 AI/NLP Identified Skills:**")
+            st.write(
+                ", ".join(
+                    sorted(resume_skills)
+                )
+            )
+        else:
+            st.warning(
+                "No dataset-mapped skills were identified from the resume. "
+                "You can still enter skills manually below."
+            )
+    else:
+        st.error(
+            "Could not read the uploaded resume. "
+            "Please upload a valid PDF, DOCX or TXT file."
+        )
 
 st.caption(
-    "Enter your skills separated by commas."
+    "You can enter skills manually, upload a resume, or use both."
 )
 
-
-user_skills = st.text_input(
+manual_user_skills = st.text_input(
     "🛠️ Your Skills",
     placeholder=(
         "Example: Python, SQL, Pandas, "
         "Machine Learning"
     )
 )
+
+manual_skill_set = extract_user_skills(
+    manual_user_skills
+)
+
+combined_skill_set = (
+    manual_skill_set | resume_skills
+)
+
+user_skills = ", ".join(
+    sorted(combined_skill_set)
+)
+
+if resume_skills:
+    st.info(
+        f"🎯 Matching will use {len(combined_skill_set)} combined skills "
+        f"from your resume and manual input."
+    )
 
 
 # =====================================================
@@ -915,6 +984,95 @@ def extract_user_skills(user_text):
 
 
     return result
+
+
+# =====================================================
+# RESUME UPLOAD + NLP SKILL EXTRACTION
+# =====================================================
+
+def extract_resume_text(uploaded_file):
+    """Extract readable text from PDF, DOCX or TXT resume files."""
+    if uploaded_file is None:
+        return ""
+
+    try:
+        file_name = uploaded_file.name.lower()
+
+        if file_name.endswith(".pdf"):
+            if PdfReader is None:
+                return ""
+
+            reader = PdfReader(uploaded_file)
+            pages = []
+
+            for page in reader.pages:
+                page_text = page.extract_text() or ""
+                pages.append(page_text)
+
+            return "\n".join(pages).strip()
+
+        if file_name.endswith(".docx"):
+            if Document is None:
+                return ""
+
+            document = Document(uploaded_file)
+            return "\n".join(
+                paragraph.text
+                for paragraph in document.paragraphs
+                if paragraph.text.strip()
+            ).strip()
+
+        if file_name.endswith(".txt"):
+            return uploaded_file.getvalue().decode(
+                "utf-8", errors="ignore"
+            ).strip()
+
+    except Exception:
+        return ""
+
+    return ""
+
+
+def extract_skills_from_resume(resume_text, dataframe):
+    """
+    Identify skills appearing in the resume from the existing dataset
+    skill vocabulary. The dataset itself is never modified.
+    """
+    if not resume_text:
+        return set()
+
+    normalized_resume = re.sub(
+        r"\s+",
+        " ",
+        resume_text.lower()
+    )
+
+    dataset_skills = set()
+
+    for value in dataframe["job_skill_set"].dropna().astype(str):
+        dataset_skills.update(
+            extract_required_skills(value)
+        )
+
+    found_skills = set()
+
+    for skill in dataset_skills:
+        skill_clean = clean_skill(skill)
+
+        if not skill_clean:
+            continue
+
+        # Match the complete skill phrase while allowing punctuation such
+        # as C#, .NET, C++, etc. to remain searchable.
+        skill_pattern = re.escape(skill_clean)
+
+        if re.search(
+            rf"(?<![a-z0-9]){skill_pattern}(?![a-z0-9])",
+            normalized_resume
+        ):
+            found_skills.add(skill_clean)
+
+    return found_skills
 
 
 # =====================================================
@@ -1766,99 +1924,6 @@ if st.button(
                         "The final percentage uses direct skill matching, AI/NLP semantic similarity, "
                         "and selected-position relevance."
                     )
-
-
-# =====================================================
-# ADVANCED FEATURE — CAREER INSIGHTS
-# =====================================================
-
-# The insights are shown only after a successful recommendation search.
-if "recommendations" in locals() and isinstance(
-    recommendations, pd.DataFrame
-) and not recommendations.empty:
-
-    st.divider()
-    st.subheader("🚀 Career Insights")
-
-    best_job = recommendations.iloc[0]
-
-    all_missing_skills = set()
-
-    for _, rec_row in recommendations.iterrows():
-        rec_missing = rec_row.get("missing_skills", set())
-
-        if isinstance(rec_missing, set):
-            all_missing_skills.update(rec_missing)
-
-    insight_col1, insight_col2, insight_col3 = st.columns(3)
-
-    with insight_col1:
-        st.markdown(
-            f"""
-            <div class="insight-card">
-            <b>🏆 Best Current Match</b>
-            <h3>{best_job["job_title"]}</h3>
-            <p>
-            Match: <b>{float(best_job["match_percentage"]):.1f}%</b>
-            </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with insight_col2:
-        st.markdown(
-            f"""
-            <div class="insight-card">
-            <b>🎯 Matching Skills</b>
-            <h3>{int(best_job["matched_skill_count"])}</h3>
-            <p>skills matched in the best recommendation</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with insight_col3:
-        st.markdown(
-            f"""
-            <div class="insight-card">
-            <b>📚 Skill Development</b>
-            <h3>{len(all_missing_skills)}</h3>
-            <p>unique skills identified across Top 5 jobs</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    if all_missing_skills:
-        st.markdown("#### 📚 Skills You Can Develop Next")
-
-        skills_html = "".join(
-            f'<span class="skill-tag">📌 {skill}</span>'
-            for skill in sorted(all_missing_skills)
-        )
-
-        st.markdown(
-            f"""
-            <div class="gap-card">
-            {skills_html}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.caption(
-            "These skills are identified from the required skills "
-            "of your Top 5 recommendations and can guide your "
-            "future learning and career preparation."
-        )
-
-    st.markdown("#### 🔎 Alternative Career Opportunities")
-    st.write(
-        "The Top 5 recommendations also provide alternative roles "
-        "within your selected career category based on your current "
-        "skills and selected-position relevance."
-    )
 
 
 # =====================================================
