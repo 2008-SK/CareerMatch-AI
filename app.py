@@ -884,14 +884,17 @@ page_options = [
     "🔍 Skill Gap & Learning"
 ]
 
+# Keep navigation robust on Streamlit Cloud.
+# The previous version calculated the radio index from session state,
+# which could raise ValueError when an old/invalid page value existed.
+if "page" not in st.session_state or st.session_state.page not in page_options:
+    st.session_state.page = page_options[0]
+
 current_page_label = st.sidebar.radio(
     "Navigate",
     page_options,
-    index=page_options.index(
-        st.session_state.get("page", "Home")
-        if st.session_state.get("page", "Home") in page_options
-        else "Home"
-    )
+    index=page_options.index(st.session_state.page),
+    key="main_navigation"
 )
 
 st.session_state.page = current_page_label
