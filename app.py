@@ -422,33 +422,6 @@ def extract_user_skills(user_text):
     }
 
 
-def calculate_position_similarity(user_position, job_position):
-    user_position = clean_skill(user_position)
-    job_position = clean_skill(job_position)
-
-    if user_position == job_position:
-        return 100.0
-
-    user_words = set(user_position.split())
-    job_words = set(job_position.split())
-
-    if not user_words or not job_words:
-        return 0.0
-
-    common_words = user_words.intersection(job_words)
-
-    if not common_words:
-        return 0.0
-
-    union_words = user_words.union(job_words)
-
-    similarity = (
-        len(common_words) / len(union_words)
-    ) * 100
-
-    return round(min(similarity, 100.0), 2)
-
-
 def calculate_skill_score(user_skill_set, required_skill_set):
     if not user_skill_set or not required_skill_set:
         return 0.0, 0.0, 0.0, set()
@@ -588,12 +561,11 @@ def calculate_semantic_score(
 
 # =====================================================
 # CORE RECOMMENDATION ENGINE
-# ORIGINAL LOGIC PRESERVED + AI ADDITION
+# POSITION INPUT REMOVED
 # =====================================================
 
 def get_recommendations(
     category,
-    job_title,
     user_skills,
     semantic_enabled=True
 ):
@@ -620,7 +592,7 @@ def get_recommendations(
         if not required_skills:
             continue
 
-        # ORIGINAL DIRECT SKILL SCORE
+        # DIRECT SKILL SCORE
         (
             skill_score,
             precision_percentage,
@@ -631,18 +603,9 @@ def get_recommendations(
             required_skills
         )
 
-        # ORIGINAL POSITION RELEVANCE
-        position_score = calculate_position_similarity(
-            job_title,
-            row["job_title"]
-        )
-
-        # ORIGINAL FINAL SCORE:
-        # Skills = 85%, Position = 15%
-        original_final_score = (
-            skill_score * 0.85
-            + position_score * 0.15
-        )
+        # Position input removed.
+        # Skill score is now the main direct matching score.
+        original_final_score = skill_score
 
         # NEW AI/NLP SCORE
         semantic_score = 0.0
@@ -655,8 +618,7 @@ def get_recommendations(
                 required_skills
             )
 
-        # AI-assisted score is shown separately.
-        # Original recommendation percentage remains intact.
+        # AI-assisted score
         ai_assisted_score = (
             original_final_score * 0.75
             + semantic_score * 0.25
@@ -677,7 +639,6 @@ def get_recommendations(
             "skill_score": skill_score,
             "precision_percentage": precision_percentage,
             "recall_percentage": recall_percentage,
-            "position_relevance": position_score,
             "semantic_score": semantic_score,
             "required_skill_count": len(required_skills),
             "matched_skill_count": len(matched_skills)
@@ -694,14 +655,14 @@ def get_recommendations(
         right_on="index"
     )
 
-    # ORIGINAL ranking preserved.
+    # Rank based on skill matching.
     recommendations = (
         recommendations
         .sort_values(
             by=[
                 "match_percentage",
                 "skill_score",
-                "position_relevance"
+                "semantic_score"
             ],
             ascending=False
         )
@@ -722,13 +683,14 @@ def youtube_search_url(skill):
 
 
 # =====================================================
-# MAIN JOB SEARCH — ORIGINAL INPUT FLOW
+# MAIN JOB SEARCH
+# POSITION INPUT REMOVED
 # =====================================================
 
 st.subheader("🔎 Find Your Job")
 
 st.info(
-    "Select a category, choose a position, enter your skills, "
+    "Select a category, enter your skills, "
     "and click **FIND MY TOP 5 JOBS**."
 )
 
@@ -756,35 +718,7 @@ category = st.selectbox(
 
 
 # STEP 2
-category_data = df[
-    df["category"] == category
-].copy()
-
-category_jobs = sorted(
-    category_data["job_title"]
-    .dropna()
-    .astype(str)
-    .str.strip()
-    .loc[lambda x: x != ""]
-    .unique()
-)
-
-st.markdown("### 2️⃣ Select Your Job Position")
-
-if not category_jobs:
-    st.error(
-        "No job positions found for this category."
-    )
-    st.stop()
-
-job_title = st.selectbox(
-    "💼 Available Positions",
-    category_jobs
-)
-
-
-# STEP 3
-st.markdown("### 3️⃣ Enter Your Skills")
+st.markdown("### 2️⃣ Enter Your Skills")
 
 user_skills = st.text_input(
     "🛠️ Your Skills",
@@ -899,7 +833,7 @@ else:
 
 
 # =====================================================
-# FIND TOP 5 — ORIGINAL BUTTON
+# FIND TOP 5
 # =====================================================
 
 st.divider()
@@ -907,7 +841,6 @@ st.divider()
 st.subheader("🎯 Find Your Jobs")
 
 st.write(
-    "The original recommendation flow is preserved. "
     "Your manual skills and extracted resume skills can be used together."
 )
 
@@ -943,7 +876,6 @@ if st.button(
         ):
             recommendations = get_recommendations(
                 category,
-                job_title,
                 combined_skills_text,
                 semantic_enabled=semantic_enabled
             )
@@ -986,7 +918,7 @@ if recommendations is not None:
 
         st.caption(
             f"Based on: {st.session_state.recommendation_source} | "
-            f"Category: {category} | Position: {job_title}"
+            f"Category: {category}"
         )
 
         for number, (_, row) in enumerate(
@@ -1050,7 +982,7 @@ if recommendations is not None:
                 f"📄 View Full Details - Job {number}"
             ):
 
-                m1, m2, m3, m4 = st.columns(4)
+                m1, m2, m3 = st.columns(3)
 
                 m1.metric(
                     "Final Match",
@@ -1063,11 +995,6 @@ if recommendations is not None:
                 )
 
                 m3.metric(
-                    "Position Match",
-                    f"{row['position_relevance']:.1f}%"
-                )
-
-                m4.metric(
                     "NLP Semantic",
                     f"{row['semantic_score']:.1f}%"
                 )
