@@ -9,6 +9,28 @@ import time
 from io import BytesIO
 from urllib.parse import quote_plus
 
+# Optional PDF/OCR libraries
+try:
+    import fitz  # PyMuPDF
+    HAS_PYMUPDF = True
+except ImportError:
+    fitz = None
+    HAS_PYMUPDF = False
+
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    Image = None
+    HAS_PIL = False
+
+try:
+    import pytesseract
+    HAS_OCR = True
+except ImportError:
+    pytesseract = None
+    HAS_OCR = False
+
 # Optional library for course certificates
 try:
     from reportlab.lib import colors
@@ -625,75 +647,276 @@ def calculate_skill_score(user_skill_set, required_skill_set):
     )
 
 
+def _reset_uploaded_file(uploaded_file):
+    """Safely move Streamlit's uploaded-file pointer back to the beginning."""
+    try:
+        uploaded_file.seek(0)
+    except Exception:
+        pass
+
+
+def _clean_extracted_text(text):
+    """Normalize extracted resume text while preserving useful punctuation."""
+    if not text:
+        return ""
+
+    text = str(text).replace("\x00", " ")
+    text = text.replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def _extract_pdf_text_pymupdf(file_bytes):
+    """Extract text from normal/text PDFs using PyMuPDF."""
+    if not HAS_PYMUPDF:
+        return ""
+
+    text_parts = []
+    document = None
+    try:
+        document = fitz.open(stream=file_bytes, filetype="pdf")
+        for page in document:
+            page_text = page.get_text("text", sort=True) or ""
+            if page_text.strip():
+                text_parts.append(page_text)
+    except Exception:
+        return ""
+    finally:
+        if document is not None:
+            try:
+                document.close()
+            except Exception:
+                pass
+
+    return _clean_extracted_text("\n".join(text_parts))
+
+
+def _extract_pdf_text_pdfplumber(file_bytes):
+    """Second PDF text-extraction fallback."""
+    if pdfplumber is None:
+        return ""
+
+    text_parts = []
+    try:
+        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text(x_tolerance=2, y_tolerance=3) or ""
+                if page_text.strip():
+                    text_parts.append(page_text)
+    except Exception:
+        return ""
+
+    return _clean_extracted_text("\n".join(text_parts))
+
+
+def _ocr_pdf(file_bytes):
+    """OCR scanned/image PDFs when Tesseract is available."""
+    if not (HAS_PYMUPDF and HAS_OCR and HAS_PIL):
+        return ""
+
+    text_parts = []
+    document = None
+    try:
+        document = fitz.open(stream=file_bytes, filetype="pdf")
+        for page in document:
+            # 2x rendering gives OCR much better accuracy for resumes.
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            page_text = pytesseract.image_to_string(image, config="--psm 6") or ""
+            if page_text.strip():
+                text_parts.append(page_text)
+    except Exception:
+        return ""
+    finally:
+        if document is not None:
+            try:
+                document.close()
+            except Exception:
+                pass
+
+    return _clean_extracted_text("\n".join(text_parts))
+
+
+def _extract_docx_text(file_bytes):
+    """Extract text from paragraphs, tables, headers and footers in DOCX."""
+    if docx is None:
+        return ""
+
+    text_parts = []
+    try:
+        document = docx.Document(BytesIO(file_bytes))
+
+        for paragraph in document.paragraphs:
+            if paragraph.text and paragraph.text.strip():
+                text_parts.append(paragraph.text)
+
+        for table in document.tables:
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if cells:
+                    text_parts.append(" | ".join(cells))
+
+        for section in document.sections:
+            for paragraph in section.header.paragraphs:
+                if paragraph.text and paragraph.text.strip():
+                    text_parts.append(paragraph.text)
+            for paragraph in section.footer.paragraphs:
+                if paragraph.text and paragraph.text.strip():
+                    text_parts.append(paragraph.text)
+
+    except Exception:
+        return ""
+
+    return _clean_extracted_text("\n".join(text_parts))
+
+
 def parse_resume(uploaded_file):
+    """Robust resume parser for PDF, DOCX and TXT.
+
+    PDF extraction uses multiple fallbacks and OCR for scanned resumes.
+    """
     if uploaded_file is None:
         return ""
 
     file_type = uploaded_file.name.rsplit(".", 1)[-1].lower()
-    extracted_text = ""
+
+    try:
+        _reset_uploaded_file(uploaded_file)
+        file_bytes = uploaded_file.getvalue()
+    except Exception:
+        _reset_uploaded_file(uploaded_file)
+        file_bytes = uploaded_file.read()
+
+    if not file_bytes:
+        return ""
 
     try:
         if file_type == "pdf":
-            if pdfplumber is None:
-                return ""
+            # 1) Fast and reliable text extraction for normal PDFs.
+            extracted_text = _extract_pdf_text_pymupdf(file_bytes)
 
-            with pdfplumber.open(uploaded_file) as pdf:
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        extracted_text += page_text + "\n"
+            # 2) Fallback for PDFs that PyMuPDF cannot parse well.
+            if len(re.sub(r"\s+", "", extracted_text)) < 40:
+                fallback_text = _extract_pdf_text_pdfplumber(file_bytes)
+                if len(fallback_text) > len(extracted_text):
+                    extracted_text = fallback_text
 
-        elif file_type == "docx":
-            if docx is None:
-                return ""
+            # 3) OCR fallback for scanned/image-only resumes.
+            if len(re.sub(r"\s+", "", extracted_text)) < 40:
+                ocr_text = _ocr_pdf(file_bytes)
+                if len(ocr_text) > len(extracted_text):
+                    extracted_text = ocr_text
 
-            document = docx.Document(
-                BytesIO(uploaded_file.read())
-            )
+            return _clean_extracted_text(extracted_text)
 
-            for paragraph in document.paragraphs:
-                extracted_text += paragraph.text + "\n"
+        if file_type == "docx":
+            return _extract_docx_text(file_bytes)
 
-        elif file_type == "txt":
-            extracted_text = uploaded_file.read().decode(
-                "utf-8",
-                errors="ignore"
+        if file_type == "txt":
+            return _clean_extracted_text(
+                file_bytes.decode("utf-8", errors="ignore")
             )
 
     except Exception as exc:
         st.error(f"Unable to read resume: {exc}")
         return ""
 
-    return extracted_text
+    return ""
+
+
+def _normalize_resume_for_skill_matching(text):
+    """Normalize resume text for reliable skill matching."""
+    text = str(text).lower()
+    replacements = {
+        "machine-learning": "machine learning",
+        "machinelearning": "machine learning",
+        "power-bi": "power bi",
+        "powerbi": "power bi",
+        "ms-excel": "excel",
+        "microsoft excel": "excel",
+        "microsoft sql server": "sql server",
+        "scikit-learn": "scikit learn",
+        "sklearn": "scikit learn",
+        "c sharp": "c#",
+        "c plus plus": "c++",
+        "node.js": "nodejs",
+        "react.js": "react",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    text = re.sub(r"[\u2010-\u2015\-]+", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _skill_aliases(skill):
+    """Return common resume spellings for a canonical dataset skill."""
+    canonical = clean_skill(skill)
+    aliases = {canonical}
+    alias_map = {
+        "python": {"python", "python3", "python 3"},
+        "sql": {"sql", "structured query language"},
+        "machine learning": {"machine learning", "ml", "machinelearning"},
+        "deep learning": {"deep learning", "dl"},
+        "artificial intelligence": {"artificial intelligence", "ai"},
+        "data analysis": {"data analysis", "data analytics"},
+        "data science": {"data science", "data scientist"},
+        "excel": {"excel", "ms excel", "microsoft excel", "msexcel"},
+        "power bi": {"power bi", "powerbi", "microsoft power bi"},
+        "tableau": {"tableau"},
+        "pandas": {"pandas"},
+        "numpy": {"numpy"},
+        "scikit learn": {"scikit learn", "scikit-learn", "sklearn"},
+        "c++": {"c++", "cpp", "c plus plus"},
+        "c#": {"c#", "c sharp"},
+        "javascript": {"javascript", "java script", "js"},
+        "typescript": {"typescript", "ts"},
+        "html": {"html", "html5"},
+        "css": {"css", "css3"},
+        "react": {"react", "reactjs", "react.js"},
+        "nodejs": {"nodejs", "node js", "node.js"},
+        "git": {"git", "github"},
+        "github": {"github"},
+    }
+    aliases.update(alias_map.get(canonical, set()))
+    return aliases
+
+
+def _contains_skill(normalized_text, skill_variant):
+    """Match a skill variant without failing on symbols such as C++, C# or .NET."""
+    variant = clean_skill(skill_variant)
+    if not variant:
+        return False
+
+    if variant in {"c++", "c#", ".net", "r", "go"}:
+        compact_text = re.sub(r"\s+", "", normalized_text)
+        compact_variant = re.sub(r"\s+", "", variant)
+        return compact_variant in compact_text
+
+    variant = re.sub(r"\s+", " ", variant)
+    pattern = r"(?<![a-z0-9])" + re.escape(variant).replace(r"\ ", r"\s+") + r"(?![a-z0-9])"
+    return re.search(pattern, normalized_text, flags=re.IGNORECASE) is not None
 
 
 def extract_skills_from_resume(raw_text, dataset_skills):
+    """Extract dataset-recognized skills with aliases and robust boundaries."""
     if not raw_text:
         return set()
 
-    text = raw_text.lower()
+    normalized_text = _normalize_resume_for_skill_matching(raw_text)
     found = set()
 
-    # Longest skills first reduces partial-match issues.
-    for skill in sorted(
-        dataset_skills,
-        key=len,
-        reverse=True
-    ):
-        if not skill:
+    for skill in sorted(dataset_skills, key=lambda x: len(str(x)), reverse=True):
+        canonical = clean_skill(skill)
+        if not canonical:
             continue
 
-        # Flexible spaces between words.
-        pattern = r"(?<!\w)" + re.escape(skill).replace(
-            r"\ ",
-            r"\s+"
-        ) + r"(?!\w)"
-
-        if re.search(pattern, text, flags=re.IGNORECASE):
-            found.add(skill)
+        if any(_contains_skill(normalized_text, alias) for alias in _skill_aliases(canonical)):
+            found.add(canonical)
 
     return found
-
 
 def calculate_semantic_score(
     user_profile,
@@ -1895,8 +2118,19 @@ with job_tab:
     resume_file = st.file_uploader(
         "Upload Resume",
         type=["pdf", "docx", "txt"],
-        help="Supported formats: PDF, DOCX and TXT"
+        help="Supported formats: PDF, DOCX and TXT. Scanned PDFs are handled with OCR when available."
     )
+
+    status_cols = st.columns(3)
+    with status_cols[0]:
+        st.markdown("**📄 PDF text**  ")
+        st.caption("PyMuPDF + pdfplumber")
+    with status_cols[1]:
+        st.markdown("**🔍 Scanned PDF**  ")
+        st.caption("OCR fallback")
+    with status_cols[2]:
+        st.markdown("**🧠 Skill matching**  ")
+        st.caption("Aliases + robust matching")
 
     all_dataset_skills = set()
 
@@ -1906,6 +2140,10 @@ with job_tab:
         )
 
     if resume_file is not None:
+
+        # Clear previous resume data whenever a new file is uploaded.
+        st.session_state.resume_text = ""
+        st.session_state.resume_skills = set()
 
         resume_text = parse_resume(resume_file)
 
@@ -1917,6 +2155,19 @@ with job_tab:
 
             st.session_state.resume_text = resume_text
             st.session_state.resume_skills = resume_skills
+
+            st.success(
+                f"📄 Resume text extracted successfully ({len(resume_text):,} characters)."
+            )
+
+            with st.expander("👀 Preview extracted resume text", expanded=False):
+                st.text_area(
+                    "Extracted text",
+                    resume_text[:5000],
+                    height=220,
+                    disabled=True,
+                    label_visibility="collapsed"
+                )
 
             if resume_skills:
                 st.success(
@@ -1948,8 +2199,12 @@ with job_tab:
 
         else:
             st.error(
-                "Could not extract text from this resume."
+                "❌ Resume text could not be extracted. The file may be empty, corrupted, password-protected, or an image-only PDF without OCR support."
             )
+            if resume_file.name.lower().endswith(".pdf") and not HAS_OCR:
+                st.info(
+                    "💡 OCR fallback is not installed in this deployment. Add `pytesseract` to requirements.txt and `tesseract-ocr` to packages.txt for scanned PDF resumes."
+                )
 
 
     # =====================================================
