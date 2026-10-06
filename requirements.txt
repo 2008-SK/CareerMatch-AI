@@ -1,6 +1,7 @@
 streamlit
 pandas
-pdfplumber
-python-docx
+numpy
 sentence-transformers
+pypdf
+python-docx
 reportlab
