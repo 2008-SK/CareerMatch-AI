@@ -3,6 +3,4 @@ pandas
 pdfplumber
 python-docx
 sentence-transformers
-google-genai
-plotly
 reportlab
