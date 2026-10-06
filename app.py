@@ -5,6 +5,7 @@ import json
 import os
 import hashlib
 import ast
+import time
 from io import BytesIO
 from urllib.parse import quote_plus
 
@@ -45,6 +46,74 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# =====================================================
+# MODERN UI THEME
+# =====================================================
+st.markdown("""
+<style>
+    .stApp {
+        background: linear-gradient(135deg, #f7f9ff 0%, #eef4ff 45%, #f9f5ff 100%);
+    }
+    [data-testid="stHeader"] { background: rgba(255,255,255,0); }
+    .hero-card {
+        padding: 30px 34px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #172554, #4338ca 55%, #7c3aed);
+        color: white;
+        box-shadow: 0 14px 35px rgba(67,56,202,.20);
+        margin-bottom: 22px;
+    }
+    .hero-card h1 { margin: 0; font-size: 2.45rem; }
+    .hero-card p { margin: 7px 0 0; font-size: 1.05rem; opacity: .92; }
+    .course-card {
+        padding: 20px;
+        border-radius: 18px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 8px 24px rgba(15,23,42,.07);
+        margin: 10px 0;
+    }
+    .video-card {
+        padding: 18px 20px;
+        border-radius: 18px;
+        background: white;
+        border-left: 6px solid #6366f1;
+        box-shadow: 0 7px 22px rgba(15,23,42,.07);
+        margin: 10px 0 14px;
+    }
+    .video-done { border-left-color: #16a34a; background: linear-gradient(90deg,#f0fdf4,#ffffff); }
+    .video-wait { border-left-color: #f59e0b; background: linear-gradient(90deg,#fffbeb,#ffffff); }
+    .badge {
+        display:inline-block; padding:5px 11px; border-radius:999px;
+        font-size:.82rem; font-weight:700; margin-bottom:7px;
+    }
+    .badge-green { background:#dcfce7; color:#166534; }
+    .badge-blue { background:#dbeafe; color:#1e40af; }
+    .badge-orange { background:#fef3c7; color:#92400e; }
+    .progress-wrap {
+        padding: 16px 18px; border-radius: 16px; background:#ffffff;
+        box-shadow: 0 7px 20px rgba(15,23,42,.06); margin: 12px 0 20px;
+    }
+    div.stButton > button[kind="primary"] {
+        border-radius: 12px; font-weight: 700;
+        background: linear-gradient(90deg,#4f46e5,#7c3aed);
+        border: none;
+    }
+    .certificate-note {
+        padding: 15px 18px; border-radius: 14px;
+        background: linear-gradient(90deg,#eff6ff,#f5f3ff);
+        border:1px solid #c7d2fe; color:#312e81;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="hero-card">
+  <h1>💼 CareerMatch AI</h1>
+  <p>Discover opportunities, build skills, learn through guided courses, and earn verified course certificates.</p>
+</div>
+""", unsafe_allow_html=True)
 
 
 # =====================================================
@@ -910,6 +979,7 @@ CATEGORY_COURSES = {
 
 
 def certificate_pdf_bytes(user_name, course_title, skill, score):
+    """Create a print-ready landscape A4 certificate with a professional design."""
     if not HAS_REPORTLAB:
         return None
 
@@ -922,63 +992,67 @@ def certificate_pdf_bytes(user_name, course_title, skill, score):
         ).hexdigest()[:10].upper()
     )
 
-    c.setStrokeColor(colors.HexColor("#2E5AAC"))
-    c.setLineWidth(4)
-    c.rect(28, 28, width - 56, height - 56)
-    c.setLineWidth(1)
-    c.rect(40, 40, width - 80, height - 80)
+    navy = colors.HexColor("#172554")
+    indigo = colors.HexColor("#4F46E5")
+    violet = colors.HexColor("#7C3AED")
+    gold = colors.HexColor("#D4AF37")
+    dark = colors.HexColor("#111827")
+    gray = colors.HexColor("#4B5563")
 
-    c.setFillColor(colors.HexColor("#1F2937"))
-    c.setFont("Helvetica-Bold", 30)
-    c.drawCentredString(
-        width / 2,
-        height - 105,
-        "CERTIFICATE OF COMPLETION"
-    )
+    # Elegant double border
+    c.setFillColor(colors.white)
+    c.rect(0, 0, width, height, fill=1, stroke=0)
+    c.setStrokeColor(navy); c.setLineWidth(7)
+    c.rect(24, 24, width-48, height-48, fill=0, stroke=1)
+    c.setStrokeColor(gold); c.setLineWidth(2)
+    c.rect(37, 37, width-74, height-74, fill=0, stroke=1)
 
+    # Top accent band
+    c.setFillColor(navy)
+    c.roundRect(65, height-92, width-130, 36, 18, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, height-79, "CAREERMATCH AI  •  SKILL DEVELOPMENT PROGRAM")
+
+    c.setFillColor(indigo)
+    c.setFont("Helvetica-Bold", 32)
+    c.drawCentredString(width/2, height-135, "CERTIFICATE OF COMPLETION")
+
+    c.setFillColor(gray)
     c.setFont("Helvetica", 13)
-    c.drawCentredString(
-        width / 2,
-        height - 135,
-        "CareerMatch AI • Skill Development Program"
-    )
+    c.drawCentredString(width/2, height-165, "This certificate is proudly presented to")
 
-    c.setFont("Helvetica", 14)
-    c.drawCentredString(
-        width / 2,
-        height - 195,
-        "This certificate is proudly presented to"
-    )
+    c.setFillColor(dark)
+    c.setFont("Helvetica-Bold", 29)
+    c.drawCentredString(width/2, height-210, user_name)
 
-    c.setFillColor(colors.HexColor("#111827"))
-    c.setFont("Helvetica-Bold", 25)
-    c.drawCentredString(width / 2, height - 235, user_name)
+    # Decorative divider
+    c.setStrokeColor(gold); c.setLineWidth(2)
+    c.line(width/2-105, height-228, width/2+105, height-228)
 
-    c.setFillColor(colors.HexColor("#374151"))
-    c.setFont("Helvetica", 14)
-    c.drawCentredString(
-        width / 2,
-        height - 275,
-        "for successfully completing the course"
-    )
-
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width / 2, height - 310, course_title)
-
+    c.setFillColor(gray)
     c.setFont("Helvetica", 13)
-    c.drawCentredString(
-        width / 2,
-        height - 340,
-        f"Final Assessment: {score}%"
-    )
+    c.drawCentredString(width/2, height-258, "for successfully completing the course")
 
-    c.setFont("Helvetica", 11)
-    c.drawCentredString(
-        width / 2,
-        85,
-        f"Certificate ID: {certificate_id}   •   "
-        f"Completion Date: {pd.Timestamp.now().strftime('%d %B %Y')}"
-    )
+    c.setFillColor(violet)
+    c.setFont("Helvetica-Bold", 21)
+    c.drawCentredString(width/2, height-294, course_title)
+
+    c.setFillColor(navy)
+    c.roundRect(width/2-105, height-337, 210, 30, 15, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, height-327, f"FINAL ASSESSMENT  •  {score}%")
+
+    completion_date = pd.Timestamp.now().strftime('%d %B %Y')
+    c.setFillColor(gray)
+    c.setFont("Helvetica", 9.5)
+    c.drawString(65, 67, f"Certificate ID: {certificate_id}")
+    c.drawRightString(width-65, 67, f"Completion Date: {completion_date}")
+
+    c.setFillColor(indigo)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(width/2, 67, "CareerMatch AI")
 
     c.save()
     buffer.seek(0)
@@ -986,128 +1060,128 @@ def certificate_pdf_bytes(user_name, course_title, skill, score):
 
 
 def show_video_course(course_key, course, course_instance_key):
-    """Display exactly six fixed videos followed by a final assessment."""
+    """Show six fixed videos with automatic time-based completion indicators."""
     st.divider()
     st.markdown(f"## 🎓 {course['title']}")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Level", course["level"])
     c2.metric("Videos", "6")
     c3.metric("Duration", course["duration"])
+    completed = sum(st.session_state.get(f"video_done::{course_instance_key}::{i}", False) for i in range(1, 7))
+    c4.metric("Progress", f"{completed}/6")
 
-    st.info(
-        "Watch the 6 course-specific videos below. "
-        "There is no manual video-completion button. "
-        "The final assessment is used to verify your course learning."
-    )
+    st.markdown('<div class="progress-wrap">', unsafe_allow_html=True)
+    st.progress(completed / 6)
+    if completed == 6:
+        st.success("🎉 All 6 videos are completed. Your final assessment is now unlocked!")
+    else:
+        st.info("▶️ Open each fixed YouTube lesson. After the minimum watch-time window, its status automatically changes to ✅ Completed. No Mark Completed button is used.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Automatic completion is based on elapsed watch time because a normal
+    # Streamlit page cannot securely read YouTube's private watch-history state.
+    # This prevents the old 'click every button and instantly get a certificate' flow.
+    default_watch_seconds = 180
 
     for number, (video_title, video_url) in enumerate(course["videos"], start=1):
+        done_key = f"video_done::{course_instance_key}::{number}"
+        start_key = f"video_start::{course_instance_key}::{number}"
+        started_at = st.session_state.get(start_key)
+        is_done = st.session_state.get(done_key, False)
+
+        if not is_done and started_at:
+            elapsed = int(time.time() - started_at)
+            if elapsed >= default_watch_seconds:
+                st.session_state[done_key] = True
+                is_done = True
+                completed += 1
+                st.rerun()
+
+        css_class = "video-done" if is_done else ("video-wait" if started_at else "")
+        st.markdown(f'<div class="video-card {css_class}">', unsafe_allow_html=True)
+        if is_done:
+            st.markdown('<span class="badge badge-green">✅ VIDEO COMPLETED</span>', unsafe_allow_html=True)
+        elif started_at:
+            remaining = max(0, default_watch_seconds - int(time.time() - started_at))
+            st.markdown(f'<span class="badge badge-orange">⏳ WATCHING • {remaining//60}:{remaining%60:02d} minimum remaining</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span class="badge badge-blue">🔵 NOT STARTED</span>', unsafe_allow_html=True)
         st.markdown(f"### {number}. {video_title}")
-        st.link_button(
-            f"▶️ Watch Video {number} on YouTube",
-            video_url,
-            use_container_width=True
-        )
+        st.caption("Fixed course video • YouTube")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if not is_done:
+            if st.button(
+                f"▶️ Open Video {number} on YouTube",
+                key=f"video_open::{course_instance_key}::{number}",
+                use_container_width=True
+            ):
+                st.session_state[start_key] = time.time()
+                st.markdown(
+                    f'<meta http-equiv="refresh" content="0; url={video_url}">',
+                    unsafe_allow_html=True
+                )
+                st.link_button("Open video in YouTube", video_url, use_container_width=True)
+                st.info("The completion timer has started. Return to this course after watching; the tick will appear automatically when the minimum watch time is reached.")
+        else:
+            st.link_button("↗️ Rewatch Video", video_url, use_container_width=True)
 
         if number < 6:
             st.markdown("---")
 
+    all_done = all(st.session_state.get(f"video_done::{course_instance_key}::{i}", False) for i in range(1, 7))
     quiz_pass_key = f"video_course_passed::{course_instance_key}"
     score_key = f"video_course_score::{course_instance_key}"
     certificate_key = f"video_course_certificate::{course_instance_key}"
 
     st.divider()
+    if not all_done:
+        st.markdown("### 🔒 Final Course Assessment")
+        st.warning("Complete all 6 videos first. The final assessment will unlock automatically after all six video completion ticks appear.")
+        return
+
     st.markdown("### 📝 Final Course Assessment")
     st.caption("Answer all 5 questions. You need at least 4/5 (80%) to pass and unlock the certificate.")
 
     answers = []
     for i, (question, options, correct) in enumerate(course["quiz"]):
-        answers.append(
-            st.radio(
-                question,
-                options,
-                index=None,
-                key=f"video_course_quiz::{course_instance_key}::{i}"
-            )
-        )
+        answers.append(st.radio(question, options, index=None, key=f"video_course_quiz::{course_instance_key}::{i}"))
 
-    if st.button(
-        "🎯 Submit Final Assessment",
-        key=f"video_course_submit::{course_instance_key}",
-        type="primary",
-        use_container_width=True
-    ):
+    if st.button("🎯 Submit Final Assessment", key=f"video_course_submit::{course_instance_key}", type="primary", use_container_width=True):
         if any(answer is None for answer in answers):
             st.warning("Please answer all 5 questions before submitting.")
         else:
-            score = sum(
-                1
-                for answer, (_, options, correct) in zip(
-                    answers,
-                    course["quiz"]
-                )
-                if answer == options[ord(correct) - 65]
-            )
+            score = sum(1 for answer, (_, options, correct) in zip(answers, course["quiz"]) if answer == options[ord(correct) - 65])
             percent = int(score / len(course["quiz"]) * 100)
             st.session_state[score_key] = percent
             st.session_state[quiz_pass_key] = score >= 4
-
             if score >= 4:
-                st.success(
-                    f"🏆 Passed: {score}/5 ({percent}%). Certificate unlocked!"
-                )
+                st.success(f"🏆 Passed: {score}/5 ({percent}%). Certificate unlocked!")
             else:
-                st.warning(
-                    f"Score: {score}/5 ({percent}%). You need at least 4/5 to pass. "
-                    "Review the videos and try again."
-                )
+                st.warning(f"Score: {score}/5 ({percent}%). You need at least 4/5 to pass. Review the videos and try again.")
 
     if st.session_state.get(quiz_pass_key, False):
         score = st.session_state.get(score_key, 80)
-
-        st.markdown("### 🏆 Course Completed")
-        st.success(
-            f"You completed **{course['title']}** with a final score of **{score}%**."
-        )
-
-        certificate_name = st.text_input(
-            "👤 Name for Certificate",
-            key=f"video_course_certificate_name::{course_instance_key}"
-        )
-
+        st.markdown('<div class="certificate-note">🏆 <b>Course completed successfully.</b> Your professional certificate is ready to generate.</div>', unsafe_allow_html=True)
+        certificate_name = st.text_input("👤 Name for Certificate", key=f"video_course_certificate_name::{course_instance_key}")
         if not HAS_REPORTLAB:
-            st.error(
-                "Certificate generation requires reportlab. "
-                "Add `reportlab` to requirements.txt."
-            )
-        elif st.button(
-            "📜 Generate Certificate",
-            key=f"video_course_generate_certificate::{course_instance_key}",
-            use_container_width=True,
-            type="primary"
-        ):
+            st.error("Certificate generation requires reportlab. Add `reportlab` to requirements.txt.")
+        elif st.button("✨ Generate Professional Certificate", key=f"video_course_generate_certificate::{course_instance_key}", use_container_width=True, type="primary"):
             if not certificate_name.strip():
                 st.warning("Please enter your name first.")
             else:
-                pdf_result = certificate_pdf_bytes(
-                    certificate_name.strip(),
-                    course["title"],
-                    course["title"],
-                    score
-                )
-                st.session_state[certificate_key] = pdf_result
-                st.success("Certificate generated successfully!")
+                st.session_state[certificate_key] = certificate_pdf_bytes(certificate_name.strip(), course["title"], course["title"], score)
+                st.success("Professional certificate generated successfully!")
 
         certificate = st.session_state.get(certificate_key)
         if certificate:
             pdf_data, certificate_id = certificate
             st.success(f"Certificate ID: {certificate_id}")
             st.download_button(
-                "📥 Download / Print Certificate",
+                "📜 Download Professional Certificate (Print Ready PDF)",
                 data=pdf_data,
-                file_name=(
-                    f"CareerMatch_{course['title'].replace(' ', '_')}_Certificate.pdf"
-                ),
+                file_name=f"CareerMatch_{course['title'].replace(' ', '_')}_Certificate.pdf",
                 mime="application/pdf",
                 key=f"video_course_download::{course_instance_key}",
                 use_container_width=True
