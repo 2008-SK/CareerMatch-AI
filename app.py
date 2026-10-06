@@ -2031,7 +2031,7 @@ def show_interview_preparation():
     plan = [
         f"Understand the responsibilities of the {selected_job} role.",
         "Prepare a 60–90 second self-introduction connected to this role.",
-        f"Revise the required skills: {', '.join(required_skills[:8]) or 'role-specific skills'}.",
+        f"Revise the required skills: {', '.join(sorted(str(x).strip() for x in required_skills if str(x).strip())[:8]) or 'role-specific skills'}.",
         "Prepare one project or internship example that demonstrates your relevant skills.",
         "Practise explaining your problem-solving approach using Situation, Task, Action and Result.",
         "Review your skill gaps before the interview and prepare an honest improvement plan."
