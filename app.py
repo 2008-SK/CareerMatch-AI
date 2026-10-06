@@ -2509,16 +2509,15 @@ with job_tab:
 
 
     # =====================================================
-    # LEARNING RESOURCES — YOUTUBE + COURSE FOR EVERY GAP
+    # LEARNING MATERIAL — YOUTUBE LINKS FOR EVERY SKILL GAP
     # =====================================================
 
     if recommendations is not None and not recommendations.empty:
 
         st.divider()
-        st.subheader("📚 Skill Improvement Resources")
+        st.subheader("📚 Learning Material")
         st.write(
-            "For every missing skill, choose either a YouTube tutorial for quick learning "
-            "or start the related CareerBridge AI course for structured learning and certification."
+            "Improve the missing skills identified for your recommended jobs using relevant YouTube tutorials."
         )
 
         for job_number, (_, resource_row) in enumerate(
@@ -2530,53 +2529,35 @@ with job_tab:
             resource_missing = sorted(required.difference(candidate))
 
             with st.expander(
-                f"💼 Job {job_number}: {resource_row['job_title']} — Skill Resources",
+                f"💼 Job {job_number}: {resource_row['job_title']} — Learning Material",
                 expanded=False
             ):
                 if resource_missing:
                     st.caption(
-                        f"{len(resource_missing)} missing skill(s) for this job"
+                        f"{len(resource_missing)} missing skill(s) identified for this job"
                     )
 
                     for skill_number, missing_skill in enumerate(resource_missing, start=1):
                         youtube_url = youtube_search_url(missing_skill)
-                        _, course_info = get_course_for_skill(missing_skill)
 
-                        st.markdown(f"### {skill_number}. 🛠️ {missing_skill.title()}")
+                        st.markdown(
+                            f"### {skill_number}. 🛠️ {missing_skill.title()}"
+                        )
                         st.caption(
-                            f"Related course: {course_info['title']} • "
-                            f"{course_info['duration']}"
+                            "Recommended YouTube tutorial for learning this skill"
                         )
 
-                        r1, r2 = st.columns(2)
-                        with r1:
-                            st.link_button(
-                                "▶️ Watch YouTube Tutorial",
-                                youtube_url,
-                                use_container_width=True
-                            )
-                        with r2:
-                            if st.button(
-                                "🎓 Start Skill Course",
-                                key=f"start_course_{job_number}_{skill_number}_{hashlib.md5(missing_skill.encode()).hexdigest()}",
-                                use_container_width=True,
-                                type="primary"
-                            ):
-                                st.session_state.active_skill_course = (
-                                    resource_row["job_title"],
-                                    missing_skill
-                                )
-                                st.rerun()
+                        st.link_button(
+                            "▶️ Watch YouTube Tutorial",
+                            youtube_url,
+                            use_container_width=True
+                        )
 
                         st.markdown("---")
                 else:
                     st.success(
                         "🎉 No missing skills for this job. You are ready for this skill set!"
                     )
-
-        # The course appears only after the user clicks Start Skill Course.
-        show_selected_skill_course()
-
 
 
 
