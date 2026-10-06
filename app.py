@@ -41,7 +41,7 @@ except ImportError:
 # =====================================================
 
 st.set_page_config(
-    page_title="CareerMatch AI",
+    page_title="CareerBridge AI",
     page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -232,7 +232,7 @@ if not st.session_state.logged_in:
     st.markdown("""
     <div class="auth-card">
         <div class="auth-icon">💼</div>
-        <h1>CareerMatch AI</h1>
+        <h1>CareerBridge AI</h1>
         <p>Smart Job Recommendation & Skill Development Platform</p>
     </div>
     """, unsafe_allow_html=True)
@@ -341,28 +341,7 @@ st.session_state.current_user = current_user
 st.sidebar.markdown("### 👤 Account")
 st.sidebar.caption(f"Signed in as **{current_user.get('username', 'User')}**")
 
-with st.sidebar.expander("📜 Activity & Learning History", expanded=False):
-    login_history = current_user.get("login_history", [])
-    course_history = current_user.get("course_history", [])
-
-    st.markdown("**🔐 Login History**")
-    if login_history:
-        for item in login_history[:10]:
-            st.markdown(
-                f"• **{item.get('username', 'User')}**  \n  {item.get('date', '')}"
-            )
-    else:
-        st.caption("No login history yet.")
-
-    st.markdown("**🎓 Course Completion History**")
-    if course_history:
-        for item in course_history[:10]:
-            st.markdown(
-                f"• **{item.get('course_title','Course')}**  \n  \n  {item.get('score',0)}% • {item.get('completed_on','')}"
-            )
-            st.caption(f"Certificate ID: {item.get('certificate_id','—')}")
-    else:
-        st.caption("No completed courses yet.")
+st.sidebar.caption("📜 View Login & Course History from the History tab.")
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.logged_in = False
@@ -541,7 +520,7 @@ st.markdown(
 st.markdown(
     """
 <div class="hero">
-    <h1>💼 CareerMatch AI</h1>
+    <h1>💼 CareerBridge AI</h1>
     <p><b>AI-Assisted Smart Job Recommendation System</b></p>
     <p>Find suitable jobs using your skills, resume and NLP-based matching.</p>
 </div>
@@ -1137,7 +1116,7 @@ def certificate_pdf_bytes(user_name, course_title, skill, score):
 
     c.setFillColor(indigo)
     c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(width/2, 67, "CareerMatch AI")
+    c.drawCentredString(width/2, 67, "CareerBridge AI")
 
     c.save()
     buffer.seek(0)
@@ -1359,12 +1338,59 @@ def show_independent_courses():
 # =====================================================
 
 # =====================================================
+# HISTORY TAB
+# =====================================================
+
+def show_history():
+    current_user = ensure_user_history(load_user() or {})
+
+    st.markdown("""
+    <div class="course-hero">
+        <h2>📜 My Activity & Learning History</h2>
+        <p>View your login activity and completed courses in one place.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    login_history = current_user.get("login_history", [])
+    course_history = current_user.get("course_history", [])
+
+    login_col, course_col = st.columns(2)
+
+    with login_col:
+        st.markdown("### 🔐 Login History")
+        if login_history:
+            for item in login_history[:30]:
+                st.markdown(
+                    f"**👤 {item.get('username', current_user.get('username', 'User'))}** "
+                    f"— {item.get('date', 'Date not available')}"
+                )
+                st.divider()
+        else:
+            st.info("No login history available yet.")
+
+    with course_col:
+        st.markdown("### 🎓 Course Completion History")
+        if course_history:
+            for item in course_history[:50]:
+                st.markdown(f"**📘 {item.get('course_title', 'Course')}**")
+                st.caption(
+                    f"Score: {item.get('score', 0)}%  •  "
+                    f"Completed: {item.get('completed_on', '—')}"
+                )
+                st.caption(f"Certificate ID: {item.get('certificate_id', '—')}")
+                st.divider()
+        else:
+            st.info("No course has been completed yet.")
+
+
+# =====================================================
 # MAIN APPLICATION TABS
 # =====================================================
 
-job_tab, course_tab = st.tabs([
+job_tab, course_tab, history_tab = st.tabs([
     "💼 Job Recommendation",
-    "🎓 Courses & Skill Development"
+    "🎓 Courses & Skill Development",
+    "📜 My History"
 ])
 
 with job_tab:
@@ -1802,7 +1828,7 @@ with job_tab:
         st.subheader("📚 Skill Improvement Resources")
         st.write(
             "For every missing skill, choose either a YouTube tutorial for quick learning "
-            "or start the related CareerMatch AI course for structured learning and certification."
+            "or start the related CareerBridge AI course for structured learning and certification."
         )
 
         for job_number, (_, resource_row) in enumerate(
@@ -1867,6 +1893,9 @@ with job_tab:
 with course_tab:
     show_independent_courses()
 
+with history_tab:
+    show_history()
+
 # =====================================================
 # FOOTER
 # =====================================================
@@ -1876,7 +1905,7 @@ st.markdown("---")
 st.markdown(
     """
 <div class="footer">
-    <b>💼 CareerMatch AI</b>
+    <b>💼 CareerBridge AI</b>
     <br>
     AI-Assisted Smart Job Recommendation System
     <br><br>
