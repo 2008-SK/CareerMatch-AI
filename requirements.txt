@@ -1,7 +1,9 @@
 streamlit
 pandas
-numpy
-sentence-transformers
-pypdf
+pdfplumber
 python-docx
+PyMuPDF
+Pillow
+pytesseract
+sentence-transformers
 reportlab
