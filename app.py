@@ -50,6 +50,17 @@ st.set_page_config(
 # =====================================================
 # MODERN UI THEME
 # =====================================================
+# Additional professional UI polish
+st.markdown("""
+<style>
+.block-container { max-width: 1400px; padding-top: 1.4rem; padding-bottom: 2.5rem; }
+[data-testid="stTabs"] button { font-weight: 700; padding: 0.75rem 1rem; }
+[data-testid="stMetric"] { background: rgba(255,255,255,.78); border: 1px solid rgba(99,102,241,.12); border-radius: 16px; padding: 12px; box-shadow: 0 6px 18px rgba(15,23,42,.06); }
+.stButton > button, .stDownloadButton > button { border-radius: 12px !important; font-weight: 700 !important; min-height: 44px; }
+div[data-testid="stExpander"] { border-radius: 16px; border: 1px solid rgba(99,102,241,.14); overflow: hidden; }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
     .stApp {
@@ -833,6 +844,76 @@ def get_recommendations(
     )
 
     return recommendations
+
+
+def get_course_for_skill(skill):
+    """Safely map a missing job skill to one of the fixed learning courses."""
+    normalized = clean_skill(skill)
+
+    skill_map = {
+        "python": "python",
+        "sql": "sql",
+        "pandas": "pandas",
+        "machine learning": "machine_learning",
+        "ml": "machine_learning",
+        "java": "java",
+        "javascript": "javascript",
+        "js": "javascript",
+        "excel": "excel",
+        "microsoft excel": "excel",
+    }
+
+    course_key = skill_map.get(normalized)
+
+    if course_key is None:
+        # Try a safe partial match for skills such as "python programming".
+        for skill_name, mapped_key in skill_map.items():
+            if skill_name in normalized or normalized in skill_name:
+                course_key = mapped_key
+                break
+
+    if course_key is None or course_key not in VIDEO_COURSES:
+        # Always return a valid fallback course instead of raising NameError/KeyError.
+        course_key = "python"
+
+    course = VIDEO_COURSES[course_key]
+    return course_key, {
+        "title": course.get("title", "Python Programming Fundamentals"),
+        "duration": course.get("duration", "3–4 hours"),
+        "level": course.get("level", "Beginner"),
+    }
+
+
+def show_selected_skill_course():
+    """Show a fixed course selected from Skill Improvement Resources."""
+    active = st.session_state.get("active_skill_course")
+    if not active:
+        return
+
+    job_title, missing_skill = active
+    course_key, course_info = get_course_for_skill(missing_skill)
+    course = VIDEO_COURSES[course_key].copy()
+    course_instance_key = f"skill_gap::{course_key}::{job_title}::{missing_skill}"
+
+    st.divider()
+    st.markdown("### 🎓 Recommended Skill Course")
+    st.info(
+        f"This course was selected because **{missing_skill.title()}** is a skill gap for **{job_title}**."
+    )
+    st.markdown(
+        f"**{course_info['title']}**  •  {course_info['level']}  •  {course_info['duration']}"
+    )
+
+    if st.button(
+        "▶️ Open Skill Course",
+        key="open_selected_skill_course",
+        type="primary",
+        use_container_width=True
+    ):
+        st.session_state.active_skill_course_open = True
+
+    if st.session_state.get("active_skill_course_open", False):
+        show_video_course(course_key, course, course_instance_key)
 
 
 def youtube_search_url(skill):
