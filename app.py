@@ -713,597 +713,548 @@ def youtube_search_url(skill):
 
 
 # =====================================================
-# SKILL COURSE COMPLETION SYSTEM
+# VIDEO COURSE & CERTIFICATE SYSTEM
 # =====================================================
 
-COURSE_TEMPLATES = {
-    "python": {
-        "title": "Python Fundamentals",
-        "level": "Beginner",
-        "duration": "3–4 hours",
-        "modules": [
-            ("Python Basics", "Learn variables, data types, operators and basic syntax.", "name = 'Alex'\nage = 20\nprint(name, age)", "Create variables for your name, age and city and print them."),
-            ("Conditions & Loops", "Learn if/else conditions and for/while loops for decision making and repetition.", "for i in range(1, 6):\n    print(i)", "Print numbers from 1 to 10 and display whether each number is even or odd."),
-            ("Functions & Collections", "Learn functions and common Python collections such as lists and dictionaries.", "def add(a, b):\n    return a + b", "Create a function that accepts a list of numbers and returns the largest value."),
-            ("Practical Python", "Combine the concepts to build a small useful program and handle basic errors.", "skills = ['Python', 'SQL']\nfor skill in skills:\n    print(skill)", "Build a small skill tracker that stores five skills and displays them."),
+# Every course contains exactly 6 learning videos.
+# The app opens YouTube for the selected lesson. The user then
+# explicitly marks that lesson as completed. Certificate unlocks
+# only after all 6 videos are marked completed.
+
+VIDEO_COURSES = {
+    "Information Technology": {
+        "Python Programming Fundamentals": [
+            "Python programming for beginners introduction",
+            "Python variables data types and operators",
+            "Python if else and loops",
+            "Python functions lists and dictionaries",
+            "Python file handling and exceptions",
+            "Python mini project for beginners",
         ],
-        "quiz": [
-            ("Which keyword defines a function in Python?", ["function", "def", "fun", "define"], "B"),
-            ("Which collection stores key-value pairs?", ["List", "Tuple", "Dictionary", "Set"], "C"),
-            ("What does len() return?", ["The last item", "The number of items", "The data type", "The memory size"], "B"),
-            ("Which symbol starts a comment in Python?", ["//", "<!--", "#", "/*"], "C"),
-            ("Which loop is commonly used to iterate over a sequence?", ["for", "switch", "case", "goto"], "A"),
+        "SQL for Data Analysis": [
+            "SQL for beginners introduction SELECT",
+            "SQL WHERE ORDER BY GROUP BY",
+            "SQL aggregate functions COUNT SUM AVG",
+            "SQL JOINs explained for beginners",
+            "SQL subqueries and useful queries",
+            "SQL data analysis project for beginners",
+        ],
+        "Pandas & Data Analysis": [
+            "Pandas Python introduction DataFrame",
+            "Pandas read CSV inspect data",
+            "Pandas filtering selecting data",
+            "Pandas missing values duplicates cleaning",
+            "Pandas groupby sort and analysis",
+            "Pandas data analysis project",
+        ],
+        "Machine Learning Fundamentals": [
+            "Machine learning for beginners introduction",
+            "Machine learning supervised unsupervised learning",
+            "Python machine learning data preprocessing",
+            "Scikit learn train test split model training",
+            "Machine learning model evaluation metrics",
+            "Machine learning beginner project",
+        ],
+        "Java Programming Fundamentals": [
+            "Java programming for beginners introduction",
+            "Java variables data types operators",
+            "Java if else loops",
+            "Java methods arrays strings",
+            "Java classes objects OOP basics",
+            "Java beginner project tutorial",
+        ],
+        "JavaScript Fundamentals": [
+            "JavaScript for beginners introduction",
+            "JavaScript variables data types operators",
+            "JavaScript conditions loops functions",
+            "JavaScript arrays and objects",
+            "JavaScript DOM manipulation",
+            "JavaScript beginner project",
+        ],
+        "Data Science Fundamentals": [
+            "Data science for beginners introduction",
+            "Data science data collection and cleaning",
+            "Python data analysis for data science",
+            "Data visualization for beginners",
+            "Statistics basics for data science",
+            "Data science beginner project",
+        ],
+        "Excel for Data Analysis": [
+            "Excel data analysis for beginners",
+            "Excel formulas functions and cell references",
+            "Excel sorting filtering and tables",
+            "Excel pivot tables for beginners",
+            "Excel charts and data visualization",
+            "Excel data analysis project",
+        ],
+        "Git & GitHub Fundamentals": [
+            "Git and GitHub for beginners introduction",
+            "Git init add commit explained",
+            "Git branch merge and checkout",
+            "GitHub repositories push pull clone",
+            "GitHub README and project management",
+            "Git and GitHub project workflow",
+        ],
+        "Web Development Fundamentals": [
+            "Web development for beginners introduction",
+            "HTML basics for beginners",
+            "CSS basics for beginners",
+            "JavaScript basics for web development",
+            "Responsive web design basics",
+            "Web development beginner project",
         ],
     },
-    "sql": {
-        "title": "SQL for Data Analysis", "level": "Beginner", "duration": "3–4 hours",
-        "modules": [
-            ("SQL Basics", "Understand databases, tables, rows, columns and SELECT queries.", "SELECT name, salary\nFROM employees;", "Write a query to display all columns from a students table."),
-            ("Filtering & Sorting", "Use WHERE, AND, OR, IN, LIKE and ORDER BY to filter data.", "SELECT * FROM employees\nWHERE salary > 50000\nORDER BY salary DESC;", "Find employees from the IT department with salary above 40000."),
-            ("Aggregations", "Use COUNT, SUM, AVG, MIN, MAX and GROUP BY to summarize data.", "SELECT department, AVG(salary)\nFROM employees\nGROUP BY department;", "Calculate the average salary for every department."),
-            ("Joins & Practical Queries", "Combine related tables using joins and build useful analytical queries.", "SELECT e.name, d.department_name\nFROM employees e\nJOIN departments d ON e.department_id = d.id;", "Join two sample tables and display a person's name with their department."),
+    "BUSINESS-DEVELOPMENT": {
+        "Business Development Fundamentals": [
+            "Business development fundamentals for beginners",
+            "Market research and customer needs",
+            "Lead generation and prospecting basics",
+            "Sales funnel and business development strategy",
+            "Business communication and presentation skills",
+            "Business development case study",
         ],
-        "quiz": [
-            ("Which command retrieves data?", ["SELECT", "INSERT", "DELETE", "DROP"], "A"),
-            ("Which clause filters rows?", ["GROUP BY", "WHERE", "ORDER BY", "JOIN"], "B"),
-            ("Which function calculates an average?", ["COUNT", "SUM", "AVG", "MAX"], "C"),
-            ("Which clause groups records?", ["GROUP BY", "WHERE", "VALUES", "SET"], "A"),
-            ("Which operation combines related tables?", ["JOIN", "SORT", "PRINT", "LOOP"], "A"),
+        "Communication & Presentation Skills": [
+            "Communication skills for professionals",
+            "Business communication basics",
+            "Presentation skills for beginners",
+            "Public speaking confidence tips",
+            "Professional email communication",
+            "Business presentation practical tips",
         ],
-    },
-    "pandas": {
-        "title": "Pandas for Data Analysis", "level": "Beginner", "duration": "3–4 hours",
-        "modules": [
-            ("Series & DataFrames", "Understand the basic Pandas structures used for tabular data.", "import pandas as pd\ndf = pd.DataFrame({'Name':['A','B'], 'Score':[80,90]})", "Create a DataFrame containing five students and their marks."),
-            ("Reading & Inspecting Data", "Learn to load CSV data and inspect rows, columns, types and missing values.", "df = pd.read_csv('data.csv')\nprint(df.head())", "Load a CSV and display its first five rows and column names."),
-            ("Cleaning Data", "Handle missing values, duplicates and inconsistent text values.", "df = df.drop_duplicates()\ndf['Name'] = df['Name'].str.strip()", "Remove duplicate rows and clean whitespace from a text column."),
-            ("Filtering & Analysis", "Filter records, select columns and calculate useful statistics.", "result = df[df['Score'] >= 70]", "Filter students scoring 70 or above and calculate their average score."),
+        "Excel for Business Analysis": [
+            "Excel for business analysis beginners",
+            "Excel formulas for business analysis",
+            "Excel data cleaning and filtering",
+            "Excel pivot tables business analysis",
+            "Excel charts and dashboards",
+            "Excel business analysis project",
         ],
-        "quiz": [
-            ("Which library provides DataFrame?", ["NumPy", "Pandas", "Matplotlib", "Flask"], "B"),
-            ("Which function reads CSV?", ["read_csv", "load_csv", "open_csv", "csv_read"], "A"),
-            ("Which method removes duplicates?", ["drop_duplicates", "remove_rows", "unique_rows", "delete_duplicates"], "A"),
-            ("Which attribute gives column names?", ["df.columns", "df.names", "df.fields", "df.headers"], "A"),
-            ("Which method shows the first rows?", ["tail", "head", "first", "top"], "B"),
+        "Digital Marketing Fundamentals": [
+            "Digital marketing fundamentals for beginners",
+            "SEO basics for beginners",
+            "Social media marketing basics",
+            "Content marketing fundamentals",
+            "Email marketing basics",
+            "Digital marketing strategy project",
         ],
-    },
-    "machine learning": {
-        "title": "Machine Learning Fundamentals", "level": "Beginner", "duration": "4–5 hours",
-        "modules": [
-            ("ML Concepts", "Understand supervised, unsupervised and reinforcement learning at a basic level.", "X = [[1], [2], [3]]\ny = [2, 4, 6]", "Classify a simple real-world problem as supervised or unsupervised learning."),
-            ("Data Preparation", "Learn features, labels, train-test split and basic preprocessing.", "from sklearn.model_selection import train_test_split\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)", "Identify the features and target variable in a student performance dataset."),
-            ("Model Training", "Understand fitting a model and making predictions.", "model.fit(X_train, y_train)\npredictions = model.predict(X_test)", "Train a simple regression or classification model on a small dataset."),
-            ("Evaluation", "Learn why accuracy and other evaluation metrics are important.", "accuracy = (predictions == y_test).mean()", "Compare two model results and explain which one performs better and why."),
+        "Customer Relationship Management (CRM)": [
+            "CRM fundamentals for beginners",
+            "Customer relationship management basics",
+            "CRM sales pipeline explained",
+            "CRM customer data management",
+            "CRM lead management basics",
+            "CRM practical workflow tutorial",
         ],
-        "quiz": [
-            ("What is a feature?", ["Input variable", "Final report", "Password", "Output format"], "A"),
-            ("Which learning type uses labelled data?", ["Supervised", "Unsupervised", "Random", "Manual"], "A"),
-            ("What does fit() generally do?", ["Deletes data", "Trains the model", "Prints data", "Creates a database"], "B"),
-            ("Why split train and test data?", ["To test generalization", "To increase file size", "To remove labels", "To rename columns"], "A"),
-            ("Accuracy is mainly used for?", ["Measuring predictions", "Sorting files", "Creating folders", "Parsing PDFs"], "A"),
+        "Python for Business Data": [
+            "Python for business data analysis",
+            "Python data handling basics",
+            "Pandas for business data",
+            "Python data cleaning tutorial",
+            "Python charts for business data",
+            "Python business data analysis project",
         ],
-    },
-    "java": {
-        "title": "Java Programming Fundamentals", "level": "Beginner", "duration": "4–5 hours",
-        "modules": [
-            ("Java Basics", "Learn classes, main method, variables and primitive data types.", "public class Main {\n  public static void main(String[] args) {\n    int age = 20;\n  }\n}", "Create a Java program that stores and prints a student's name and marks."),
-            ("Conditions & Loops", "Use if/else, switch and loops to control program flow.", "for(int i=1; i<=5; i++){\n    System.out.println(i);\n}", "Print the first ten even numbers using a loop."),
-            ("Methods & Arrays", "Create reusable methods and work with arrays.", "static int add(int a, int b){\n    return a+b;\n}", "Write a method that returns the largest value in an integer array."),
-            ("OOP Basics", "Understand classes, objects, constructors and encapsulation.", "class Student {\n    String name;\n}", "Create a Student class with two properties and one method."),
-        ],
-        "quiz": [
-            ("Which method is the entry point of a Java program?", ["start()", "main()", "run()", "begin()"], "B"),
-            ("Which keyword creates a class?", ["class", "object", "define", "struct"], "A"),
-            ("Which concept hides internal data?", ["Encapsulation", "Compilation", "Iteration", "Casting"], "A"),
-            ("Which structure repeats code?", ["Loop", "Package", "Import", "Class"], "A"),
-            ("An object is an instance of a...", ["Method", "Class", "Loop", "Variable"], "B"),
+        "Data Analysis with Pandas": [
+            "Pandas data analysis for beginners",
+            "Pandas DataFrame basics",
+            "Pandas filtering and sorting",
+            "Pandas data cleaning",
+            "Pandas groupby analysis",
+            "Pandas business data project",
         ],
     },
-    "javascript": {
-        "title": "JavaScript Fundamentals", "level": "Beginner", "duration": "3–4 hours",
-        "modules": [
-            ("JavaScript Basics", "Learn variables, data types and operators.", "const name = 'Alex';\nlet age = 20;", "Create variables for a user's name, age and course."),
-            ("Conditions & Functions", "Use conditions and functions to build reusable logic.", "function add(a, b) { return a + b; }", "Create a function that checks whether a number is even."),
-            ("Arrays & Objects", "Store structured data using arrays and objects.", "const student = {name:'A', score:85};", "Create an array of three student objects."),
-            ("DOM Basics", "Understand how JavaScript can interact with HTML elements.", "document.getElementById('title').textContent = 'Hello';", "Change the text of an HTML element using JavaScript."),
+    "FINANCE": {
+        "Financial Analysis Fundamentals": [
+            "Financial analysis fundamentals for beginners",
+            "Financial statements explained",
+            "Financial ratios for beginners",
+            "Profit loss and cash flow analysis",
+            "Financial forecasting basics",
+            "Financial analysis case study",
         ],
-        "quiz": [
-            ("Which keyword declares a constant?", ["const", "fixed", "constant", "let"], "A"),
-            ("Which method selects an element by ID?", ["getElementById", "selectId", "findId", "idElement"], "A"),
-            ("Which structure stores key-value pairs?", ["Object", "Loop", "Function", "String"], "A"),
-            ("Which keyword defines a function traditionally?", ["function", "def", "fun", "method"], "A"),
-            ("Which symbol is commonly used for strict equality?", ["=", "==", "===", "=>"], "C"),
+        "Accounting Fundamentals": [
+            "Accounting basics for beginners",
+            "Debit credit journal entries explained",
+            "Ledger and trial balance basics",
+            "Income statement and balance sheet",
+            "Cash flow statement basics",
+            "Accounting practical example",
+        ],
+        "Excel for Finance": [
+            "Excel for finance beginners",
+            "Excel financial formulas",
+            "Excel financial functions tutorial",
+            "Excel financial data analysis",
+            "Excel pivot tables for finance",
+            "Excel finance dashboard project",
+        ],
+        "SQL for Finance Data": [
+            "SQL for finance data analysis",
+            "SQL filtering financial records",
+            "SQL aggregate functions finance",
+            "SQL joins for finance data",
+            "SQL financial reporting queries",
+            "SQL finance data analysis project",
+        ],
+        "Python for Finance": [
+            "Python for finance beginners",
+            "Python financial data analysis",
+            "Pandas for finance data",
+            "Python stock data analysis basics",
+            "Python financial visualization",
+            "Python finance project for beginners",
+        ],
+        "Data Analysis with Pandas": [
+            "Pandas for financial data analysis",
+            "Pandas DataFrame finance data",
+            "Pandas filtering financial records",
+            "Pandas missing data cleaning",
+            "Pandas groupby financial analysis",
+            "Pandas finance analysis project",
+        ],
+        "Machine Learning for Finance": [
+            "Machine learning in finance for beginners",
+            "Finance data preprocessing machine learning",
+            "Supervised learning for financial data",
+            "Regression for finance beginners",
+            "Model evaluation for finance data",
+            "Machine learning finance project",
+        ],
+    },
+    "HR": {
+        "Human Resource Management": [
+            "Human resource management fundamentals",
+            "HR planning and workforce management",
+            "Performance management basics HR",
+            "Employee engagement fundamentals",
+            "Compensation and benefits basics",
+            "HR management practical case study",
+        ],
+        "Recruitment & Talent Acquisition": [
+            "Recruitment fundamentals for beginners",
+            "Talent acquisition process explained",
+            "Job description and sourcing basics",
+            "Interview and candidate screening",
+            "Recruitment metrics basics",
+            "Talent acquisition case study",
+        ],
+        "HR Analytics Fundamentals": [
+            "HR analytics for beginners",
+            "HR data collection and cleaning",
+            "Excel HR analytics basics",
+            "HR metrics and KPIs",
+            "HR dashboards and visualization",
+            "HR analytics project for beginners",
+        ],
+        "Communication & Interview Skills": [
+            "Professional communication skills",
+            "Interview communication skills",
+            "HR interview basics",
+            "Behavioral interview questions",
+            "Active listening communication skills",
+            "Professional interview practice",
+        ],
+        "Excel for HR Analytics": [
+            "Excel for HR analytics beginners",
+            "Excel HR data cleaning",
+            "Excel formulas for HR",
+            "Excel pivot tables HR analytics",
+            "Excel HR dashboard tutorial",
+            "Excel HR analytics project",
+        ],
+        "SQL for HR Data": [
+            "SQL for HR analytics beginners",
+            "SQL employee data filtering",
+            "SQL HR aggregate queries",
+            "SQL joins employee data",
+            "SQL HR reporting queries",
+            "SQL HR analytics project",
+        ],
+        "Python for HR Analytics": [
+            "Python for HR analytics beginners",
+            "Pandas HR data analysis",
+            "Python HR data cleaning",
+            "Python employee data visualization",
+            "Python HR metrics analysis",
+            "Python HR analytics project",
+        ],
+    },
+    "Sales": {
+        "Sales Fundamentals": [
+            "Sales fundamentals for beginners",
+            "Sales process and sales funnel",
+            "Lead generation and prospecting",
+            "Sales communication skills",
+            "Objection handling and closing",
+            "Sales case study for beginners",
+        ],
+        "Customer Relationship Management (CRM)": [
+            "CRM fundamentals for sales",
+            "CRM sales pipeline management",
+            "CRM lead tracking basics",
+            "CRM customer data management",
+            "CRM sales reporting basics",
+            "CRM practical sales workflow",
+        ],
+        "Communication & Negotiation Skills": [
+            "Negotiation skills for beginners",
+            "Sales communication skills",
+            "Business negotiation fundamentals",
+            "Customer handling communication",
+            "Negotiation tactics for sales",
+            "Sales negotiation case study",
+        ],
+        "Digital Marketing Fundamentals": [
+            "Digital marketing for sales beginners",
+            "Lead generation digital marketing",
+            "Social media marketing for sales",
+            "Email marketing for lead generation",
+            "Content marketing for sales",
+            "Digital sales strategy project",
+        ],
+        "Excel for Sales Analytics": [
+            "Excel for sales analytics beginners",
+            "Excel sales data cleaning",
+            "Excel sales formulas and functions",
+            "Excel pivot tables sales",
+            "Excel sales charts dashboard",
+            "Excel sales analytics project",
+        ],
+        "SQL for Sales Data": [
+            "SQL for sales analytics beginners",
+            "SQL sales data filtering",
+            "SQL sales aggregate queries",
+            "SQL joins for sales data",
+            "SQL sales reporting queries",
+            "SQL sales analytics project",
+        ],
+        "Python for Sales Analytics": [
+            "Python for sales analytics beginners",
+            "Pandas sales data analysis",
+            "Python sales data cleaning",
+            "Python sales visualization",
+            "Python sales KPI analysis",
+            "Python sales analytics project",
         ],
     },
 }
 
 
-def normalize_course_key(skill):
-    s = clean_skill(skill)
-    aliases = {
-        "python 3": "python", "python programming": "python",
-        "sql server": "sql", "mysql": "sql", "mysql workbench": "sql",
-        "pandas library": "pandas", "pandas dataframe": "pandas",
-        "ml": "machine learning", "machinelearning": "machine learning",
-        "java programming": "java", "javascript programming": "javascript",
-        "js": "javascript",
-    }
-    if s in COURSE_TEMPLATES:
-        return s
-    if s in aliases:
-        return aliases[s]
-    for key in COURSE_TEMPLATES:
-        if key in s or s in key:
-            return key
-    return "generic"
+def course_video_url(query):
+    return "https://www.youtube.com/results?search_query=" + quote_plus(query)
 
 
-def build_generic_course(skill):
-    title = skill.title()
-    return {
-        "title": f"{title} Skill Development",
-        "level": "Beginner",
-        "duration": "2–3 hours",
-        "modules": [
-            (f"Introduction to {title}", f"Understand the purpose, terminology and common uses of {title}.", f"Skill: {title}\nGoal: understand the fundamentals", f"Write five important concepts or uses of {title}."),
-            (f"Core Concepts of {title}", f"Study the fundamental concepts and workflow used when working with {title}.", f"{title} workflow → Input → Process → Output", f"Describe the basic workflow of {title} in your own words."),
-            (f"Practical {title}", f"Apply the skill to a small practical task related to your career goal.", f"Practice task: Build a small example using {title}.", f"Create one small practical example using {title}."),
-            (f"Job-Oriented Practice", f"Connect {title} with a real job requirement and identify what you need to practise further.", f"Job Skill: {title}\nPractice → Test → Improve", f"Find one job-related task where {title} would be useful and explain it."),
-        ],
-        "quiz": [
-            (f"What is the main goal of learning {title}?", ["Build practical skill", "Avoid practice", "Delete data", "Only memorize terms"], "A"),
-            (f"Which approach is best for improving {title}?", ["Practice regularly", "Never practise", "Skip examples", "Only read titles"], "A"),
-            (f"Where can {title} be useful?", ["Real projects", "Only games", "Only passwords", "Nowhere"], "A"),
-            ("What should you do after learning a concept?", ["Apply it", "Forget it", "Delete it", "Avoid examples"], "A"),
-            ("What helps confirm your understanding?", ["Practice and assessment", "Skipping all tasks", "Only opening the page", "No activity"], "A"),
-        ],
-    }
+def course_state_key(category, course_title):
+    return "video_course::" + hashlib.md5(
+        f"{category}::{course_title}".encode()
+    ).hexdigest()
 
 
-def get_course_for_skill(skill):
-    key = normalize_course_key(skill)
-    if key == "generic":
-        return f"generic::{clean_skill(skill)}", build_generic_course(skill)
-    return key, COURSE_TEMPLATES[key]
-
-
-def certificate_pdf_bytes(user_name, course_title, skill, score):
+def certificate_pdf_bytes(course_name, user_name, score_text):
     if not HAS_REPORTLAB:
         return None
+
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=landscape(A4))
     width, height = landscape(A4)
-    certificate_id = f"CMAI-{hashlib.sha256((user_name + course_title + skill).encode()).hexdigest()[:10].upper()}"
+    certificate_id = "CMAI-" + hashlib.sha256(
+        f"{user_name}{course_name}{pd.Timestamp.now().date()}".encode()
+    ).hexdigest()[:10].upper()
+
     c.setStrokeColor(colors.HexColor("#2E5AAC"))
     c.setLineWidth(4)
     c.rect(28, 28, width - 56, height - 56)
     c.setLineWidth(1)
     c.rect(40, 40, width - 80, height - 80)
+
     c.setFillColor(colors.HexColor("#1F2937"))
     c.setFont("Helvetica-Bold", 30)
-    c.drawCentredString(width / 2, height - 105, "CERTIFICATE OF COMPLETION")
+    c.drawCentredString(
+        width / 2, height - 105, "CERTIFICATE OF COMPLETION"
+    )
+
     c.setFont("Helvetica", 13)
-    c.drawCentredString(width / 2, height - 135, "CareerMatch AI • Skill Development Program")
+    c.drawCentredString(
+        width / 2, height - 135,
+        "CareerMatch AI • Courses & Skill Development"
+    )
+
     c.setFont("Helvetica", 14)
-    c.drawCentredString(width / 2, height - 195, "This certificate is proudly presented to")
+    c.drawCentredString(
+        width / 2, height - 195,
+        "This certificate is proudly presented to"
+    )
+
     c.setFillColor(colors.HexColor("#111827"))
     c.setFont("Helvetica-Bold", 25)
     c.drawCentredString(width / 2, height - 235, user_name)
+
     c.setFillColor(colors.HexColor("#374151"))
     c.setFont("Helvetica", 14)
-    c.drawCentredString(width / 2, height - 275, "for successfully completing the course")
+    c.drawCentredString(
+        width / 2, height - 275,
+        "for successfully completing the course"
+    )
+
     c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width / 2, height - 310, course_title)
+    c.drawCentredString(width / 2, height - 310, course_name)
+
     c.setFont("Helvetica", 13)
-    c.drawCentredString(width / 2, height - 340, f"Skill: {skill.title()}   •   Final Assessment: {score}%")
+    c.drawCentredString(
+        width / 2, height - 345,
+        f"All 6 learning videos completed • {score_text}"
+    )
+
     c.setFont("Helvetica", 11)
-    c.drawCentredString(width / 2, 85, f"Certificate ID: {certificate_id}   •   Completion Date: {pd.Timestamp.now().strftime('%d %B %Y')}")
+    c.drawCentredString(
+        width / 2, 85,
+        f"Certificate ID: {certificate_id} • "
+        f"Completion Date: {pd.Timestamp.now().strftime('%d %B %Y')}"
+    )
+
     c.save()
     buffer.seek(0)
     return buffer.getvalue(), certificate_id
 
 
-def show_selected_skill_course():
-    """Show the course only after the user explicitly selects Start Course."""
-    active = st.session_state.get("active_skill_course")
-    if not active:
-        return
-
-    job_title, skill = active
-    course_key, course = get_course_for_skill(skill)
-    state_key = f"{job_title}::{skill}::{course_key}"
-
-    st.divider()
-    st.subheader(f"🎓 Course: {course['title']}")
-    st.caption(
-        f"For job: {job_title}  •  Required skill: {skill.title()}"
-    )
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Level", course["level"])
-    c2.metric("Modules", len(course["modules"]))
-    c3.metric("Duration", course["duration"])
-
-    if state_key not in st.session_state.course_progress:
-        st.session_state.course_progress[state_key] = set()
-
-    completed = st.session_state.course_progress[state_key]
-    total = len(course["modules"])
-    progress = len(completed) / total if total else 0
-
-    st.progress(progress)
-    st.caption(f"Course Progress: {len(completed)}/{total} modules completed")
-
-    for i, (title, lesson, example, practice) in enumerate(course["modules"]):
-        done = i in completed
-        with st.expander(
-            f"{'✅' if done else '📘'} Module {i + 1}: {title}",
-            expanded=(i == 0 and not done)
-        ):
-            st.markdown("**Lesson**")
-            st.write(lesson)
-            st.markdown("**Example**")
-            st.code(example, language="text")
-            st.markdown("**Practice Task**")
-            st.write(practice)
-
-            if done:
-                st.success("Module completed.")
-            elif st.button(
-                "✅ Mark Module Complete",
-                key=f"complete_{hashlib.md5((state_key + str(i)).encode()).hexdigest()}",
-                use_container_width=True
-            ):
-                completed.add(i)
-                st.session_state.course_progress[state_key] = completed
-                st.rerun()
-
-    if len(completed) < total:
-        st.info("Complete all modules to unlock the final assessment.")
-        return
-
-    st.success("🎉 All modules completed. Final assessment is now unlocked.")
-    quiz_state_key = state_key + "::quiz"
-    score_state_key = state_key + "::score"
-
-    st.markdown("### 📝 Final Skill Assessment")
-    st.caption("Answer all 5 questions. You need at least 4/5 (80%) to pass.")
-
-    answers = []
-    for i, (question, options, correct) in enumerate(course["quiz"]):
-        answers.append(
-            st.radio(
-                question,
-                options,
-                index=None,
-                key=f"quiz_{hashlib.md5((state_key + str(i)).encode()).hexdigest()}"
-            )
-        )
-
-    if st.button(
-        "🎯 Submit Assessment",
-        key=f"submit_{hashlib.md5(state_key.encode()).hexdigest()}",
-        type="primary",
-        use_container_width=True
-    ):
-        if any(answer is None for answer in answers):
-            st.warning("Please answer all questions before submitting.")
-        else:
-            score = sum(
-                1
-                for answer, (_, options, correct) in zip(answers, course["quiz"])
-                if answer == options[ord(correct) - 65]
-            )
-            percent = int(score / len(course["quiz"]) * 100)
-            st.session_state.course_quiz_results[quiz_state_key] = score >= 4
-            st.session_state.course_quiz_results[score_state_key] = percent
-            if score >= 4:
-                st.success(f"🏆 Passed: {score}/5 ({percent}%). Certificate unlocked!")
-            else:
-                st.warning(
-                    f"Score: {score}/5 ({percent}%). You need at least 4/5. "
-                    "Review the modules and try again."
-                )
-
-    if st.session_state.course_quiz_results.get(quiz_state_key, False):
-        score = st.session_state.course_quiz_results.get(score_state_key, 80)
-        st.markdown("### 🏆 Course Completed")
-        st.success(
-            f"You completed **{course['title']}** for **{skill.title()}** with **{score}%**."
-        )
-
-        certificate_name = st.text_input(
-            "👤 Name for Certificate",
-            key=f"certificate_name_{hashlib.md5(state_key.encode()).hexdigest()}"
-        )
-
-        if not HAS_REPORTLAB:
-            st.error("Certificate generation requires reportlab. Add `reportlab` to requirements.txt.")
-        elif st.button(
-            "📜 Generate Certificate",
-            key=f"certificate_{hashlib.md5(state_key.encode()).hexdigest()}",
-            use_container_width=True
-        ):
-            if not certificate_name.strip():
-                st.warning("Please enter your name first.")
-            else:
-                pdf_data, certificate_id = certificate_pdf_bytes(
-                    certificate_name.strip(),
-                    course["title"],
-                    skill,
-                    score
-                )
-                st.session_state.course_certificates[state_key] = (
-                    pdf_data,
-                    certificate_id
-                )
-                st.success(
-                    f"Certificate generated successfully. ID: {certificate_id}"
-                )
-
-        certificate = st.session_state.course_certificates.get(state_key)
-        if certificate:
-            pdf_data, certificate_id = certificate
-            st.download_button(
-                "📥 Download / Print Certificate",
-                data=pdf_data,
-                file_name=f"CareerMatch_{clean_skill(skill).replace(' ', '_')}_Certificate.pdf",
-                mime="application/pdf",
-                key=f"download_{hashlib.md5((state_key + 'download').encode()).hexdigest()}",
-                use_container_width=True
-            )
-
-
-
-
-# =====================================================
-# INDEPENDENT COURSE CATALOG
-# =====================================================
-
-CATEGORY_COURSES = {
-    "BUSINESS-DEVELOPMENT": [
-        ("Business Fundamentals", "business fundamentals"),
-        ("Business Development Fundamentals", "business development"),
-        ("Communication & Presentation Skills", "communication"),
-        ("Excel for Business Analysis", "excel"),
-        ("Digital Marketing Fundamentals", "digital marketing"),
-        ("Customer Relationship Management (CRM)", "crm"),
-        ("Python for Business Data", "python"),
-        ("Data Analysis with Pandas", "pandas"),
-    ],
-    "FINANCE": [
-        ("Financial Analysis Fundamentals", "financial analysis"),
-        ("Accounting Fundamentals", "accounting"),
-        ("Excel for Finance", "excel"),
-        ("SQL for Finance Data", "sql"),
-        ("Python for Finance", "python"),
-        ("Data Analysis with Pandas", "pandas"),
-        ("Machine Learning for Finance", "machine learning"),
-    ],
-    "HR": [
-        ("Human Resource Management", "human resource management"),
-        ("Recruitment & Talent Acquisition", "recruitment"),
-        ("HR Analytics Fundamentals", "hr analytics"),
-        ("Communication & Interview Skills", "communication"),
-        ("Excel for HR Analytics", "excel"),
-        ("SQL for HR Data", "sql"),
-        ("Python for HR Analytics", "python"),
-    ],
-    "Sales": [
-        ("Sales Fundamentals", "sales"),
-        ("Customer Relationship Management (CRM)", "crm"),
-        ("Communication & Negotiation Skills", "communication"),
-        ("Digital Marketing Fundamentals", "digital marketing"),
-        ("Excel for Sales Analytics", "excel"),
-        ("SQL for Sales Data", "sql"),
-        ("Python for Sales Analytics", "python"),
-    ],
-    "Information Technology": [
-        ("Python Programming Fundamentals", "python"),
-        ("SQL for Data Analysis", "sql"),
-        ("Pandas & Data Analysis", "pandas"),
-        ("Machine Learning Fundamentals", "machine learning"),
-        ("Java Programming Fundamentals", "java"),
-        ("JavaScript Fundamentals", "javascript"),
-        ("Data Science Fundamentals", "data science"),
-        ("Excel for Data Analysis", "excel"),
-        ("Git & GitHub Fundamentals", "git github"),
-        ("Web Development Fundamentals", "web development"),
-    ],
-}
-
-
-def build_independent_course(course_title, skill_key):
-    """Return a course for the independent course catalogue.
-    Known technical skills use the existing detailed courses; other
-    catalogue topics receive a structured generic course with the topic name.
-    """
-    normalized = normalize_course_key(skill_key)
-    if normalized != "generic" and normalized in COURSE_TEMPLATES:
-        base = COURSE_TEMPLATES[normalized].copy()
-        base["title"] = course_title
-        return base
-    return build_generic_course(course_title.replace(" Fundamentals", ""))
-
-
-def show_independent_courses():
+def show_video_course_catalog():
+    """Independent six-video course catalogue with completion tracking."""
     st.subheader("🎓 Courses & Skill Development")
     st.write(
-        "Explore additional courses independently of your job recommendations. "
-        "Choose a career category, select a course, learn through modules, "
-        "pass the assessment and earn a CareerMatch AI certificate."
+        "Choose a career category and start a structured course. "
+        "Every course contains 6 video lessons. Watch each lesson on YouTube "
+        "and then mark it completed. The certificate unlocks only after all "
+        "6 videos are completed."
     )
 
-    course_category = st.selectbox(
+    category = st.selectbox(
         "📂 Select Course Category",
-        list(CATEGORY_COURSES.keys()),
-        key="independent_course_category"
+        list(VIDEO_COURSES.keys()),
+        key="video_course_category"
     )
 
-    course_items = CATEGORY_COURSES[course_category]
-    course_labels = [item[0] for item in course_items]
-
-    selected_course_title = st.selectbox(
-        "📚 Select a Course",
-        course_labels,
-        key="independent_course_selector"
+    course_names = list(VIDEO_COURSES[category].keys())
+    course_title = st.selectbox(
+        "📚 Select Course",
+        course_names,
+        key="video_course_selector"
     )
 
-    selected_title, skill_key = next(
-        item for item in course_items if item[0] == selected_course_title
-    )
-    course_key = f"independent::{course_category}::{skill_key}::{selected_title}"
-    course = build_independent_course(selected_title, skill_key)
+    videos = VIDEO_COURSES[category][course_title]
+    state_key = course_state_key(category, course_title)
 
-    st.markdown(f"### 📘 {selected_title}")
+    if state_key not in st.session_state:
+        st.session_state[state_key] = set()
+
+    completed = st.session_state[state_key]
+    total = len(videos)
+
+    st.markdown(f"### 📘 {course_title}")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Level", course["level"])
-    c2.metric("Modules", len(course["modules"]))
-    c3.metric("Duration", course["duration"])
+    c1.metric("Learning Videos", total)
+    c2.metric("Completed", f"{len(completed)}/{total}")
+    c3.metric("Certificate", "Unlocked" if len(completed) == total else "Locked")
+
+    st.progress(len(completed) / total)
+    st.caption(
+        f"Course Progress: {len(completed)}/{total} videos completed"
+    )
 
     st.info(
-        f"Category: {course_category} • This course can be completed independently "
-        "even if it is not a missing skill from your recommended jobs."
+        "🎥 Watch each video first. After you finish watching, use the "
+        "separate **Mark Video Completed** button."
     )
 
-    if st.button(
-        "🚀 Start This Course",
-        key="start_independent_course",
-        type="primary",
-        use_container_width=True
-    ):
-        st.session_state.independent_active_course = course_key
-        st.session_state.independent_course_data = course
-        st.session_state.independent_course_title = selected_title
-        st.rerun()
-
-    active_key = st.session_state.get("independent_active_course")
-    if active_key != course_key:
-        return
-
-    active_course = st.session_state.get("independent_course_data", course)
-    active_title = st.session_state.get("independent_course_title", selected_title)
-    progress_key = f"independent_progress::{course_key}"
-    quiz_key = f"independent_quiz_passed::{course_key}"
-    score_key = f"independent_quiz_score::{course_key}"
-
-    if progress_key not in st.session_state:
-        st.session_state[progress_key] = set()
-    if quiz_key not in st.session_state:
-        st.session_state[quiz_key] = False
-
-    completed = st.session_state[progress_key]
-    total = len(active_course["modules"])
-    progress = len(completed) / total if total else 0
-
-    st.divider()
-    st.markdown(f"## 🎯 {active_title}")
-    st.progress(progress)
-    st.caption(f"Course Progress: {len(completed)}/{total} modules completed")
-
-    for i, (module_title, lesson, example, practice) in enumerate(active_course["modules"]):
+    for i, query in enumerate(videos):
         done = i in completed
-        with st.expander(
-            f"{'✅' if done else '📖'} Module {i + 1}: {module_title}",
-            expanded=(i == 0 and not done)
-        ):
-            st.markdown("**Lesson**")
-            st.write(lesson)
-            st.markdown("**Example**")
-            st.code(example, language="text")
-            st.markdown("**Practice Task**")
-            st.write(practice)
+        video_title = query.replace(" for beginners", "").replace(" tutorial", "")
+
+        with st.container(border=True):
+            left, right = st.columns([3, 1])
+
+            with left:
+                st.markdown(
+                    f"### {'✅' if done else '🎥'} Video {i + 1}: {video_title.title()}"
+                )
+                st.caption("YouTube learning video")
+
+            with right:
+                st.link_button(
+                    "▶️ Watch Video",
+                    course_video_url(query),
+                    use_container_width=True
+                )
 
             if done:
-                st.success("Module completed.")
+                st.success("Video completed ✓")
             else:
                 if st.button(
-                    "✅ Mark Module Complete",
-                    key=f"independent_complete::{course_key}::{i}",
+                    "✅ Mark Video Completed",
+                    key=f"complete_video::{state_key}::{i}",
                     use_container_width=True
                 ):
                     completed.add(i)
-                    st.session_state[progress_key] = completed
+                    st.session_state[state_key] = completed
                     st.rerun()
 
-    if len(completed) == total:
-        st.divider()
-        st.markdown("### 📝 Final Assessment")
-        st.caption("Answer all 5 questions. You need at least 4/5 correct to pass.")
-
-        answers = []
-        for i, (question, options, correct) in enumerate(active_course["quiz"]):
-            answers.append(
-                st.radio(
-                    question,
-                    options,
-                    key=f"independent_quiz::{course_key}::{i}",
-                    index=None
-                )
-            )
-
-        if st.button(
-            "🎯 Submit Assessment",
-            key=f"independent_submit::{course_key}",
-            type="primary",
-            use_container_width=True
-        ):
-            score = sum(
-                1
-                for answer, (_, options, correct) in zip(answers, active_course["quiz"])
-                if answer == options[ord(correct) - 65]
-            )
-            percent = int(score / len(active_course["quiz"]) * 100)
-            st.session_state[score_key] = percent
-            st.session_state[quiz_key] = score >= 4
-
-            if score >= 4:
-                st.success(f"🏆 Assessment passed: {score}/5 ({percent}%). Certificate unlocked!")
-            else:
-                st.warning(f"Score: {score}/5 ({percent}%). You need at least 4/5 to pass. Try again after reviewing the modules.")
-
-    if st.session_state.get(quiz_key, False):
-        score = st.session_state.get(score_key, 80)
-        st.divider()
-        st.markdown("### 🏆 Course Completed")
-        st.success(f"You completed **{active_title}** with a final score of **{score}%**.")
-
-        certificate_name = st.text_input(
-            "👤 Name for Certificate",
-            key=f"independent_certificate_name::{course_key}"
+    if len(completed) < total:
+        st.warning(
+            f"🔒 Certificate locked — complete all {total} videos "
+            f"to unlock your certificate."
         )
+        return
 
-        if not HAS_REPORTLAB:
-            st.error("Certificate generation requires reportlab. Add reportlab to requirements.txt.")
-        elif st.button(
-            "📜 Generate Certificate",
-            key=f"independent_generate_certificate::{course_key}",
-            use_container_width=True
-        ):
-            if not certificate_name.strip():
-                st.warning("Please enter your name first.")
-            else:
-                pdf_data = certificate_pdf_bytes(
-                    certificate_name.strip(),
-                    active_title,
-                    active_title,
-                    score
-                )
-                if pdf_data:
-                    pdf_bytes, certificate_id = pdf_data
-                    st.session_state[f"independent_certificate::{course_key}"] = pdf_bytes
-                    st.success(f"Certificate generated successfully! Certificate ID: {certificate_id}")
+    st.success(
+        "🎉 Course completed! All 6 learning videos have been marked completed. "
+        "Your certificate is now unlocked."
+    )
 
-        certificate = st.session_state.get(f"independent_certificate::{course_key}")
-        if certificate:
-            st.download_button(
-                "📥 Download / Print Certificate",
-                data=certificate,
-                file_name=f"{active_title.replace(' ', '_')}_Certificate.pdf",
-                mime="application/pdf",
-                key=f"independent_download_certificate::{course_key}",
-                use_container_width=True
+    st.divider()
+    st.subheader("📜 Certificate")
+
+    certificate_name = st.text_input(
+        "👤 Enter your name exactly as you want it on the certificate",
+        key=f"certificate_name::{state_key}"
+    )
+
+    if not HAS_REPORTLAB:
+        st.error(
+            "Certificate generation requires reportlab. "
+            "Add `reportlab` to requirements.txt."
+        )
+    elif st.button(
+        "🏆 Generate Certificate",
+        key=f"generate_certificate::{state_key}",
+        type="primary",
+        use_container_width=True
+    ):
+        if not certificate_name.strip():
+            st.warning("Please enter your name first.")
+        else:
+            result = certificate_pdf_bytes(
+                course_title,
+                certificate_name.strip(),
+                "6/6 learning videos completed"
             )
+            st.session_state[f"certificate_data::{state_key}"] = result
+            st.success(
+                f"Certificate generated successfully! Certificate ID: {result[1]}"
+            )
+
+    certificate = st.session_state.get(f"certificate_data::{state_key}")
+    if certificate:
+        pdf_data, certificate_id = certificate
+        st.download_button(
+            "📥 Download / Print Certificate",
+            data=pdf_data,
+            file_name=(
+                f"CareerMatch_{course_title.replace(' ', '_')}_Certificate.pdf"
+            ),
+            mime="application/pdf",
+            key=f"download_certificate::{state_key}",
+            use_container_width=True
+        )
+        st.caption(f"Certificate ID: {certificate_id}")
+
 # =====================================================
 # MAIN APPLICATION TABS
 # =====================================================
@@ -1811,7 +1762,7 @@ with job_tab:
 
 
 with course_tab:
-    show_independent_courses()
+    show_video_course_catalog()
 
 # =====================================================
 # FOOTER
