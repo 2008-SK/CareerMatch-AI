@@ -111,12 +111,12 @@ st.markdown("""
         padding: 18px 20px;
         border-radius: 18px;
         background: white;
-        border-left: 6px solid #6366f1;
+        border: 1px solid #e5e7eb;
         box-shadow: 0 7px 22px rgba(15,23,42,.07);
         margin: 10px 0 14px;
     }
-    .video-done { border-left-color: #16a34a; background: linear-gradient(90deg,#f0fdf4,#ffffff); }
-    .video-wait { border-left-color: #f59e0b; background: linear-gradient(90deg,#fffbeb,#ffffff); }
+    .video-done { border-color: #86efac; background: linear-gradient(90deg,#f0fdf4,#ffffff); }
+    .video-wait { border-color: #fcd34d; background: linear-gradient(90deg,#fffbeb,#ffffff); }
     .badge {
         display:inline-block; padding:5px 11px; border-radius:999px;
         font-size:.82rem; font-weight:700; margin-bottom:7px;
@@ -181,6 +181,9 @@ def ensure_user_history(user):
     if "course_history" not in user or not isinstance(user.get("course_history"), list):
         user["course_history"] = []
         changed = True
+    if "feedback_history" not in user or not isinstance(user.get("feedback_history"), list):
+        user["feedback_history"] = []
+        changed = True
     if changed:
         save_user(user)
     return user
@@ -213,6 +216,19 @@ def record_course_completion(user, course_title, score, certificate_id):
         })
         user["course_history"] = user["course_history"][:50]
         save_user(user)
+
+
+def record_user_feedback(user, rating, comment):
+    """Save user feedback/rating in user_data.json."""
+    user = ensure_user_history(user)
+    user["feedback_history"].insert(0, {
+        "rating": int(rating),
+        "feedback": str(comment or "").strip(),
+        "date": pd.Timestamp.now().strftime("%d %B %Y")
+    })
+    user["feedback_history"] = user["feedback_history"][:20]
+    save_user(user)
+    return user
 
 
 def hash_password(password):
@@ -1504,7 +1520,7 @@ def show_video_course(course_key, course, course_instance_key):
     score_key = f"video_course_score::{course_instance_key}"
     certificate_key = f"video_course_certificate::{course_instance_key}"
 
-    st.divider()
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
     if not all_done:
         st.markdown("### 🔒 Final Course Assessment")
         st.warning("Complete all 6 lessons first. The assessment will unlock automatically after all six green ticks appear.")
@@ -1930,7 +1946,7 @@ def show_interview_preparation():
     st.markdown("""
     <div class="course-hero">
         <h2>🎤 Interview Preparation Studio</h2>
-        <p>Prepare specifically for the jobs recommended to you — not generic interview questions.</p>
+        <p>Practice multiple role-specific questions and improve your answers step by step.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1939,12 +1955,10 @@ def show_interview_preparation():
     if recommendations is None or recommendations.empty:
         st.warning(
             "🔎 First generate your Top 5 Job Recommendations. "
-            "Your interview preparation will then be created automatically from those jobs and their required skills."
+            "Interview preparation will then be personalized from those jobs and their required skills."
         )
         st.info("Go to **💼 Job Recommendation**, enter your skills or upload your resume, and click **FIND MY TOP 5 JOBS**.")
         return
-
-    st.success("🎯 Your interview preparation is now personalized to your recommended jobs.")
 
     job_options = [row["job_title"] for _, row in recommendations.iterrows()]
     selected_job = st.selectbox(
@@ -1958,16 +1972,16 @@ def show_interview_preparation():
     matched_skills = sorted(selected_row["matched_skills"]) if isinstance(selected_row["matched_skills"], set) else []
     missing_skills = sorted(selected_row["missing_skills"]) if isinstance(selected_row["missing_skills"], set) else []
 
-    st.markdown(f"### 🏆 Preparing for: {selected_job}")
-    st.caption(f"Category: {selected_row['category']} • Job Match: {float(selected_row['match_percentage']):.1f}%")
+    st.success(f"🎯 Preparing you for **{selected_job}** using multiple interview questions.")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Job Match", f"{float(selected_row['match_percentage']):.1f}%")
     c2.metric("Matching Skills", len(matched_skills))
     c3.metric("Skills to Improve", len(missing_skills))
+    c4.metric("Practice Questions", "8")
 
     with st.expander("🛠️ Skills this interview will focus on", expanded=True):
-        st.write(", ".join(skill.title() for skill in required_skills) or "Role-specific skills")
+        st.write(", ".join(skill.title() for skill in sorted(required_skills)) or "Role-specific skills")
         if matched_skills:
             st.success("Your matching skills: " + ", ".join(skill.title() for skill in matched_skills))
         if missing_skills:
@@ -1980,14 +1994,48 @@ def show_interview_preparation():
         missing_skills
     )
 
-    q_index = st.selectbox(
-        "📝 Choose a Job-Specific Interview Question",
-        range(len(interview_questions)),
-        format_func=lambda i: f"Question {i + 1}: {interview_questions[i]['q']}",
-        key=f"interview_question_{selected_job}"
-    )
+    # Add category-specific questions and keep a focused set of 8 unique questions.
+    category_name = str(selected_row["category"]).strip()
+    category_questions = INTERVIEW_QUESTIONS.get(category_name, [])
 
+    # Dataset categories may use names such as BUSINESS-DEVELOPMENT,
+    # while the interview bank uses Business Development. Normalize them.
+    normalized_category = re.sub(r"[-_]", " ", category_name).strip().title()
+    if not category_questions:
+        category_questions = INTERVIEW_QUESTIONS.get(normalized_category, [])
+
+    question_pool = list(interview_questions) + list(category_questions) + list(INTERVIEW_QUESTIONS.get("General / HR", []))
+    unique_questions = []
+    seen = set()
+    for q in question_pool:
+        key = q.get("q", "").strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique_questions.append(q)
+
+    # Always provide a meaningful multi-question practice session.
+    interview_questions = unique_questions[:8]
+
+    state_prefix = f"interview::{selected_job}"
+    index_key = f"{state_prefix}::index"
+    scores_key = f"{state_prefix}::scores"
+    evaluated_key = f"{state_prefix}::evaluated"
+
+    if st.session_state.get("active_interview_job") != selected_job:
+        st.session_state.active_interview_job = selected_job
+        st.session_state[index_key] = 0
+        st.session_state[scores_key] = []
+        st.session_state[evaluated_key] = False
+
+    q_index = min(st.session_state.get(index_key, 0), len(interview_questions) - 1)
     q_data = interview_questions[q_index]
+    scores = st.session_state.get(scores_key, [])
+    evaluated = st.session_state.get(evaluated_key, False)
+
+    st.markdown("### 🧠 Interview Practice")
+    st.progress((q_index + (1 if evaluated else 0)) / len(interview_questions))
+    st.caption(f"Question {q_index + 1} of {len(interview_questions)}")
+
     st.markdown(f"### ❓ {q_data['q']}")
     st.caption("Answer as if you are speaking directly to the interviewer.")
 
@@ -1998,33 +2046,57 @@ def show_interview_preparation():
         key=f"interview_answer_{selected_job}_{q_index}"
     )
 
-    if st.button("🤖 Evaluate My Answer", type="primary", use_container_width=True):
-        score, matched, feedback = interview_feedback(answer, q_data)
-        st.session_state.interview_feedback = {
-            "score": score,
-            "matched": matched,
-            "feedback": feedback,
-            "question": q_data["q"],
-            "answer": q_data["answer"],
-            "job": selected_job
-        }
+    if not evaluated:
+        if st.button("🤖 Evaluate My Answer", type="primary", use_container_width=True):
+            score, matched, feedback = interview_feedback(answer, q_data)
+            result = {
+                "score": score,
+                "matched": matched,
+                "feedback": feedback,
+                "question": q_data["q"],
+                "answer": q_data["answer"],
+                "job": selected_job
+            }
+            st.session_state.interview_feedback = result
+            scores.append(score)
+            st.session_state[scores_key] = scores
+            st.session_state[evaluated_key] = True
+            st.rerun()
+    else:
+        result = st.session_state.get("interview_feedback", {})
+        if result.get("question") == q_data["q"] and result.get("job") == selected_job:
+            score = result["score"]
+            a, b, c = st.columns(3)
+            a.metric("Answer Score", f"{score}%")
+            b.metric("Relevant Points", len(result["matched"]))
+            c.metric("Status", "Strong" if score >= 80 else "Improve")
+            st.progress(score / 100)
+            if score >= 80:
+                st.success(result["feedback"])
+            else:
+                st.warning(result["feedback"])
 
-    result = st.session_state.get("interview_feedback")
-    if result and result.get("question") == q_data["q"] and result.get("job") == selected_job:
-        st.divider()
-        score = result["score"]
-        a, b, c = st.columns(3)
-        a.metric("Interview Score", f"{score}%")
-        b.metric("Relevant Points", len(result["matched"]))
-        c.metric("Answer Status", "Strong" if score >= 80 else "Improve")
-        st.progress(score / 100)
-        st.success(result["feedback"])
+            if result["matched"]:
+                st.markdown("**✅ Relevant points detected:** " + ", ".join(x.title() for x in result["matched"]))
 
-        if result["matched"]:
-            st.markdown("**✅ Relevant points detected:** " + ", ".join(x.title() for x in result["matched"]))
+            with st.expander("💡 Suggested Answer Structure"):
+                st.write(result["answer"])
 
-        with st.expander("💡 Suggested Answer Structure"):
-            st.write(result["answer"])
+            if q_index < len(interview_questions) - 1:
+                if st.button("➡️ Next Interview Question", type="primary", use_container_width=True):
+                    st.session_state[index_key] = q_index + 1
+                    st.session_state[evaluated_key] = False
+                    st.session_state.pop("interview_feedback", None)
+                    st.rerun()
+            else:
+                avg = sum(scores) / len(scores) if scores else score
+                st.success(f"🏁 Interview practice completed! Average score: **{avg:.1f}%**")
+                if st.button("🔄 Practice Again", use_container_width=True):
+                    st.session_state[index_key] = 0
+                    st.session_state[scores_key] = []
+                    st.session_state[evaluated_key] = False
+                    st.session_state.pop("interview_feedback", None)
+                    st.rerun()
 
     st.divider()
     st.subheader("🚀 Preparation Plan for This Job")
@@ -2033,22 +2105,68 @@ def show_interview_preparation():
         "Prepare a 60–90 second self-introduction connected to this role.",
         f"Revise the required skills: {', '.join(sorted(str(x).strip() for x in required_skills if str(x).strip())[:8]) or 'role-specific skills'}.",
         "Prepare one project or internship example that demonstrates your relevant skills.",
-        "Practise explaining your problem-solving approach using Situation, Task, Action and Result.",
-        "Review your skill gaps before the interview and prepare an honest improvement plan."
+        "Practise Situation, Task, Action and Result (STAR) for behavioural questions.",
+        "Review your skill gaps and prepare a practical improvement plan before the interview."
     ]
     for item in plan:
         st.markdown(f"☐ {item}")
+
+
+def show_feedback_tab():
+    st.markdown("""
+    <div class="course-hero">
+        <h2>⭐ Your Feedback Matters</h2>
+        <p>Rate your CareerBridge AI experience and optionally tell us what we can improve.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### How would you rate your experience?")
+    rating = st.radio(
+        "Select a rating",
+        [1, 2, 3, 4, 5],
+        format_func=lambda x: "⭐" * x,
+        horizontal=True,
+        key="feedback_rating"
+    )
+
+    comment = st.text_area(
+        "Optional feedback",
+        placeholder="Tell us what you liked or what we can improve...",
+        height=130,
+        key="feedback_comment"
+    )
+
+    if st.button("📨 Submit Feedback", type="primary", use_container_width=True):
+        user = ensure_user_history(load_user() or st.session_state.get("current_user", {}))
+        user = record_user_feedback(user, rating, comment)
+        st.session_state.current_user = user
+        st.success("✅ Thank you! Your feedback has been saved successfully.")
+
+    user = ensure_user_history(load_user() or st.session_state.get("current_user", {}))
+    feedback_history = user.get("feedback_history", [])
+
+    if feedback_history:
+        st.markdown("### 📝 Your Previous Feedback")
+        for item in feedback_history[:5]:
+            stars = "⭐" * int(item.get("rating", 0))
+            st.markdown(f"**{stars}**  •  {item.get('date', '—')}")
+            if item.get("feedback"):
+                st.write(item["feedback"])
+            else:
+                st.caption("No written feedback provided.")
+            st.markdown("---")
 
 
 # =====================================================
 # MAIN APPLICATION TABS
 # =====================================================
 
-job_tab, course_tab, history_tab, interview_tab = st.tabs([
+job_tab, course_tab, history_tab, interview_tab, feedback_tab = st.tabs([
     "💼 Job Recommendation",
     "🎓 Courses & Skill Development",
     "📜 My History",
-    "🎤 Interview Preparation"
+    "🎤 Interview Preparation",
+    "⭐ Feedback"
 ])
 
 with job_tab:
@@ -2564,6 +2682,9 @@ with history_tab:
 
 with interview_tab:
     show_interview_preparation()
+
+with feedback_tab:
+    show_feedback_tab()
 
 # =====================================================
 # FOOTER
