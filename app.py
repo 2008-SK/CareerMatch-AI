@@ -105,16 +105,17 @@ st.markdown("""
         background: linear-gradient(90deg,#eff6ff,#f5f3ff);
         border:1px solid #c7d2fe; color:#312e81;
     }
+    .auth-card { max-width:720px; margin:35px auto 22px; padding:38px 30px; text-align:center; border-radius:28px; color:white; background:linear-gradient(135deg,#111827,#3730a3 55%,#7c3aed); box-shadow:0 18px 45px rgba(55,48,163,.25); }
+    .auth-card h1 { margin:8px 0 5px; font-size:2.6rem; }
+    .auth-card p { margin:0; opacity:.9; font-size:1rem; }
+    .auth-icon { font-size:3rem; }
+    .feature-chip { display:inline-block; padding:7px 12px; margin:4px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:.82rem; }
+    .course-hero { padding:26px 28px; border-radius:24px; color:white; margin:10px 0 22px; background:linear-gradient(135deg,#0f172a,#4f46e5 58%,#9333ea); box-shadow:0 14px 35px rgba(79,70,229,.20); }
+    .course-hero h2 { margin:0 0 6px; }
+    .course-hero p { margin:0; opacity:.9; }
+    .status-complete { color:#15803d; font-weight:800; }
 </style>
 """, unsafe_allow_html=True)
-
-st.markdown("""
-<div class="hero-card">
-  <h1>💼 CareerMatch AI</h1>
-  <p>Discover opportunities, build skills, learn through guided courses, and earn verified course certificates.</p>
-</div>
-""", unsafe_allow_html=True)
-
 
 # =====================================================
 # USER DATA / AUTHENTICATION
@@ -134,8 +135,51 @@ def load_user():
 
 
 def save_user(user):
-    with open(USER_FILE, "w") as file:
-        json.dump(user, file)
+    with open(USER_FILE, "w", encoding="utf-8") as file:
+        json.dump(user, file, indent=2)
+
+
+def ensure_user_history(user):
+    """Add history fields to older user_data.json files safely."""
+    changed = False
+    if "login_history" not in user or not isinstance(user.get("login_history"), list):
+        user["login_history"] = []
+        changed = True
+    if "course_history" not in user or not isinstance(user.get("course_history"), list):
+        user["course_history"] = []
+        changed = True
+    if changed:
+        save_user(user)
+    return user
+
+
+def record_login_history(user):
+    """Save login history with username and date only (no time)."""
+    user = ensure_user_history(user)
+    user["login_history"].insert(0, {
+        "username": user.get("username", "User"),
+        "date": pd.Timestamp.now().strftime("%d %B %Y")
+    })
+    user["login_history"] = user["login_history"][:30]
+    save_user(user)
+
+
+def record_course_completion(user, course_title, score, certificate_id):
+    user = ensure_user_history(user)
+    # Keep the history clean: one completion record per course/certificate.
+    existing = [
+        item for item in user["course_history"]
+        if item.get("course_title") == course_title
+    ]
+    if not existing:
+        user["course_history"].insert(0, {
+            "course_title": course_title,
+            "score": score,
+            "certificate_id": certificate_id,
+            "completed_on": pd.Timestamp.now().strftime("%d %B %Y, %I:%M %p")
+        })
+        user["course_history"] = user["course_history"][:50]
+        save_user(user)
 
 
 def hash_password(password):
@@ -185,7 +229,13 @@ if "independent_course_title" not in st.session_state:
 
 if not st.session_state.logged_in:
 
-    st.title("🔐 CareerMatch AI")
+    st.markdown("""
+    <div class="auth-card">
+        <div class="auth-icon">💼</div>
+        <h1>CareerMatch AI</h1>
+        <p>Smart Job Recommendation & Skill Development Platform</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     option = st.radio(
         "Choose an option",
@@ -215,7 +265,9 @@ if not st.session_state.logged_in:
                 save_user({
                     "email": email,
                     "username": username,
-                    "password": hash_password(password)
+                    "password": hash_password(password),
+                    "login_history": [],
+                    "course_history": []
                 })
                 st.success(
                     "Registration successful! You can now login."
@@ -236,7 +288,10 @@ if not st.session_state.logged_in:
                 login_id == user["email"]
                 or login_id == user["username"]
             ) and hash_password(password) == user["password"]:
+                user = ensure_user_history(user)
+                record_login_history(user)
                 st.session_state.logged_in = True
+                st.session_state.current_user = user
                 st.success("Login successful!")
                 st.rerun()
             else:
@@ -277,11 +332,41 @@ if not st.session_state.logged_in:
 
 
 # =====================================================
-# LOGOUT
+# LOGOUT + USER HISTORY
 # =====================================================
 
-if st.sidebar.button("Logout"):
+current_user = ensure_user_history(load_user() or {})
+st.session_state.current_user = current_user
+
+st.sidebar.markdown("### 👤 Account")
+st.sidebar.caption(f"Signed in as **{current_user.get('username', 'User')}**")
+
+with st.sidebar.expander("📜 Activity & Learning History", expanded=False):
+    login_history = current_user.get("login_history", [])
+    course_history = current_user.get("course_history", [])
+
+    st.markdown("**🔐 Login History**")
+    if login_history:
+        for item in login_history[:10]:
+            st.markdown(
+                f"• **{item.get('username', 'User')}**  \n  {item.get('date', '')}"
+            )
+    else:
+        st.caption("No login history yet.")
+
+    st.markdown("**🎓 Course Completion History**")
+    if course_history:
+        for item in course_history[:10]:
+            st.markdown(
+                f"• **{item.get('course_title','Course')}**  \n  \n  {item.get('score',0)}% • {item.get('completed_on','')}"
+            )
+            st.caption(f"Certificate ID: {item.get('certificate_id','—')}")
+    else:
+        st.caption("No completed courses yet.")
+
+if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.logged_in = False
+    st.session_state.current_user = None
     st.rerun()
 
 
@@ -1060,29 +1145,30 @@ def certificate_pdf_bytes(user_name, course_title, skill, score):
 
 
 def show_video_course(course_key, course, course_instance_key):
-    """Show six fixed videos with automatic time-based completion indicators."""
+    """Display six fixed embedded videos with automatic timer-based completion."""
     st.divider()
-    st.markdown(f"## 🎓 {course['title']}")
+    completed = sum(st.session_state.get(f"video_done::{course_instance_key}::{i}", False) for i in range(1, 7))
+
+    st.markdown(f"""
+    <div class="course-hero">
+        <h2>🎓 {course['title']}</h2>
+        <p>Watch all 6 fixed lessons → complete the final assessment → earn your professional certificate.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Level", course["level"])
-    c2.metric("Videos", "6")
+    c2.metric("Lessons", "6")
     c3.metric("Duration", course["duration"])
-    completed = sum(st.session_state.get(f"video_done::{course_instance_key}::{i}", False) for i in range(1, 7))
-    c4.metric("Progress", f"{completed}/6")
-
-    st.markdown('<div class="progress-wrap">', unsafe_allow_html=True)
+    c4.metric("Completed", f"{completed}/6")
     st.progress(completed / 6)
-    if completed == 6:
-        st.success("🎉 All 6 videos are completed. Your final assessment is now unlocked!")
-    else:
-        st.info("▶️ Open each fixed YouTube lesson. After the minimum watch-time window, its status automatically changes to ✅ Completed. No Mark Completed button is used.")
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Automatic completion is based on elapsed watch time because a normal
-    # Streamlit page cannot securely read YouTube's private watch-history state.
-    # This prevents the old 'click every button and instantly get a certificate' flow.
-    default_watch_seconds = 180
+    if completed == 6:
+        st.success("🎉 All 6 lessons completed — Final Assessment unlocked!")
+    else:
+        st.info("▶️ Play each embedded lesson. Completion is recorded automatically after the lesson timer finishes. There is no Mark Completed button.")
+
+    watch_seconds = 90
 
     for number, (video_title, video_url) in enumerate(course["videos"], start=1):
         done_key = f"video_done::{course_instance_key}::{number}"
@@ -1092,43 +1178,43 @@ def show_video_course(course_key, course, course_instance_key):
 
         if not is_done and started_at:
             elapsed = int(time.time() - started_at)
-            if elapsed >= default_watch_seconds:
+            if elapsed >= watch_seconds:
                 st.session_state[done_key] = True
                 is_done = True
-                completed += 1
+                st.session_state.pop(start_key, None)
                 st.rerun()
 
-        css_class = "video-done" if is_done else ("video-wait" if started_at else "")
-        st.markdown(f'<div class="video-card {css_class}">', unsafe_allow_html=True)
+        css = "video-done" if is_done else ("video-wait" if started_at else "")
+        st.markdown(f'<div class="video-card {css}">', unsafe_allow_html=True)
+
         if is_done:
             st.markdown('<span class="badge badge-green">✅ VIDEO COMPLETED</span>', unsafe_allow_html=True)
         elif started_at:
-            remaining = max(0, default_watch_seconds - int(time.time() - started_at))
-            st.markdown(f'<span class="badge badge-orange">⏳ WATCHING • {remaining//60}:{remaining%60:02d} minimum remaining</span>', unsafe_allow_html=True)
+            remaining = max(0, watch_seconds - int(time.time() - started_at))
+            st.markdown(f'<span class="badge badge-orange">⏳ WATCHING • {remaining//60}:{remaining%60:02d} remaining</span>', unsafe_allow_html=True)
         else:
-            st.markdown('<span class="badge badge-blue">🔵 NOT STARTED</span>', unsafe_allow_html=True)
+            st.markdown('<span class="badge badge-blue">🔵 READY TO WATCH</span>', unsafe_allow_html=True)
+
         st.markdown(f"### {number}. {video_title}")
-        st.caption("Fixed course video • YouTube")
-        st.markdown('</div>', unsafe_allow_html=True)
+        video_id = video_url.split("v=")[-1].split("&")[0]
 
-        if not is_done:
-            if st.button(
-                f"▶️ Open Video {number} on YouTube",
-                key=f"video_open::{course_instance_key}::{number}",
-                use_container_width=True
-            ):
-                st.session_state[start_key] = time.time()
-                st.markdown(
-                    f'<meta http-equiv="refresh" content="0; url={video_url}">',
-                    unsafe_allow_html=True
-                )
-                st.link_button("Open video in YouTube", video_url, use_container_width=True)
-                st.info("The completion timer has started. Return to this course after watching; the tick will appear automatically when the minimum watch time is reached.")
+        if is_done or started_at:
+            iframe = f'''<iframe width="100%" height="390" src="https://www.youtube.com/embed/{video_id}?rel=0&modestbranding=1" title="{video_title}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'''
+            st.components.v1.html(iframe, height=405, scrolling=False)
         else:
-            st.link_button("↗️ Rewatch Video", video_url, use_container_width=True)
+            st.caption("Click Start Lesson to load the fixed YouTube video inside the course.")
 
-        if number < 6:
-            st.markdown("---")
+        if not is_done and not started_at:
+            if st.button(f"▶️ Start Lesson {number}", key=f"video_start_button::{course_instance_key}::{number}", use_container_width=True, type="primary"):
+                st.session_state[start_key] = time.time()
+                st.rerun()
+        elif not is_done:
+            st.caption("The completion indicator is automatic. Keep the lesson open and return after the timer finishes.")
+        else:
+            st.markdown('<span class="status-complete">✓ Lesson completed — you can rewatch it anytime.</span>', unsafe_allow_html=True)
+            st.link_button("↗️ Rewatch on YouTube", video_url, use_container_width=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     all_done = all(st.session_state.get(f"video_done::{course_instance_key}::{i}", False) for i in range(1, 7))
     quiz_pass_key = f"video_course_passed::{course_instance_key}"
@@ -1138,7 +1224,7 @@ def show_video_course(course_key, course, course_instance_key):
     st.divider()
     if not all_done:
         st.markdown("### 🔒 Final Course Assessment")
-        st.warning("Complete all 6 videos first. The final assessment will unlock automatically after all six video completion ticks appear.")
+        st.warning("Complete all 6 lessons first. The assessment will unlock automatically after all six green ticks appear.")
         return
 
     st.markdown("### 📝 Final Course Assessment")
@@ -1159,11 +1245,11 @@ def show_video_course(course_key, course, course_instance_key):
             if score >= 4:
                 st.success(f"🏆 Passed: {score}/5 ({percent}%). Certificate unlocked!")
             else:
-                st.warning(f"Score: {score}/5 ({percent}%). You need at least 4/5 to pass. Review the videos and try again.")
+                st.warning(f"Score: {score}/5 ({percent}%). You need at least 4/5 to pass. Review the lessons and try again.")
 
     if st.session_state.get(quiz_pass_key, False):
         score = st.session_state.get(score_key, 80)
-        st.markdown('<div class="certificate-note">🏆 <b>Course completed successfully.</b> Your professional certificate is ready to generate.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="certificate-note">🏆 <b>Course completed successfully.</b> Your professional print-ready certificate is ready.</div>', unsafe_allow_html=True)
         certificate_name = st.text_input("👤 Name for Certificate", key=f"video_course_certificate_name::{course_instance_key}")
         if not HAS_REPORTLAB:
             st.error("Certificate generation requires reportlab. Add `reportlab` to requirements.txt.")
@@ -1172,27 +1258,37 @@ def show_video_course(course_key, course, course_instance_key):
                 st.warning("Please enter your name first.")
             else:
                 st.session_state[certificate_key] = certificate_pdf_bytes(certificate_name.strip(), course["title"], course["title"], score)
-                st.success("Professional certificate generated successfully!")
+                certificate = st.session_state[certificate_key]
+                if certificate:
+                    _, certificate_id = certificate
+                    record_course_completion(
+                        current_user,
+                        course["title"],
+                        score,
+                        certificate_id
+                    )
+                    st.session_state.current_user = ensure_user_history(load_user() or current_user)
+                st.success("Professional certificate generated successfully! Your course completion has been saved to History.")
 
         certificate = st.session_state.get(certificate_key)
         if certificate:
             pdf_data, certificate_id = certificate
             st.success(f"Certificate ID: {certificate_id}")
-            st.download_button(
-                "📜 Download Professional Certificate (Print Ready PDF)",
-                data=pdf_data,
-                file_name=f"CareerMatch_{course['title'].replace(' ', '_')}_Certificate.pdf",
-                mime="application/pdf",
-                key=f"video_course_download::{course_instance_key}",
-                use_container_width=True
-            )
-
+            st.download_button("📜 Download Professional Certificate (Print Ready PDF)", data=pdf_data, file_name=f"CareerMatch_{course['title'].replace(' ', '_')}_Certificate.pdf", mime="application/pdf", key=f"video_course_download::{course_instance_key}", use_container_width=True)
 
 def show_independent_courses():
-    st.subheader("🎓 Courses & Skill Development")
-    st.write(
-        "Choose a career category and a course. Every course contains "
-        "6 fixed, topic-specific YouTube videos followed by a final assessment."
+    st.markdown("""
+    <div class="course-hero">
+        <h2>🎓 Courses & Skill Development</h2>
+        <p>Learn through guided fixed lessons, test your knowledge, and earn a professional certificate.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown(
+        '<span class="feature-chip">🎥 Fixed Videos</span>'
+        '<span class="feature-chip">⚡ Auto Completion</span>'
+        '<span class="feature-chip">📝 Final Quiz</span>'
+        '<span class="feature-chip">🏆 Certificate</span>',
+        unsafe_allow_html=True
     )
 
     course_category = st.selectbox(
