@@ -2509,7 +2509,7 @@ with job_tab:
 
 
     # =====================================================
-    # LEARNING MATERIAL — YOUTUBE LINKS FOR EVERY SKILL GAP
+    # LEARNING MATERIAL — SELECTED RECOMMENDED JOB ONLY
     # =====================================================
 
     if recommendations is not None and not recommendations.empty:
@@ -2517,47 +2517,42 @@ with job_tab:
         st.divider()
         st.subheader("📚 Learning Material")
         st.write(
-            "Improve the missing skills identified for your recommended jobs using relevant YouTube tutorials."
+            "YouTube learning material is provided only for the recommended job selected above in Skill Gap Analysis."
         )
 
-        for job_number, (_, resource_row) in enumerate(
-            recommendations.iterrows(),
-            start=1
-        ):
-            required = extract_required_skills(resource_row["job_skill_set"])
-            candidate = set(combined_skill_set)
-            resource_missing = sorted(required.difference(candidate))
+        selected_learning_job = selected_row["job_title"]
+        learning_missing = sorted(selected_row["missing_skills"])
 
-            with st.expander(
-                f"💼 Job {job_number}: {resource_row['job_title']} — Learning Material",
-                expanded=False
-            ):
-                if resource_missing:
-                    st.caption(
-                        f"{len(resource_missing)} missing skill(s) identified for this job"
-                    )
+        st.markdown(
+            f"### 💼 {selected_learning_job}"
+        )
+        st.caption(
+            "Learning material based on the skill gaps of your selected recommended job."
+        )
 
-                    for skill_number, missing_skill in enumerate(resource_missing, start=1):
-                        youtube_url = youtube_search_url(missing_skill)
+        if learning_missing:
+            for skill_number, missing_skill in enumerate(learning_missing, start=1):
+                youtube_url = youtube_search_url(missing_skill)
 
-                        st.markdown(
-                            f"### {skill_number}. 🛠️ {missing_skill.title()}"
-                        )
-                        st.caption(
-                            "Recommended YouTube tutorial for learning this skill"
-                        )
+                st.markdown(
+                    f"### {skill_number}. 🛠️ {missing_skill.title()}"
+                )
+                st.caption(
+                    "Recommended YouTube tutorial for learning this skill"
+                )
 
-                        st.link_button(
-                            "▶️ Watch YouTube Tutorial",
-                            youtube_url,
-                            use_container_width=True
-                        )
+                st.link_button(
+                    "▶️ Watch YouTube Tutorial",
+                    youtube_url,
+                    use_container_width=True
+                )
 
-                        st.markdown("---")
-                else:
-                    st.success(
-                        "🎉 No missing skills for this job. You are ready for this skill set!"
-                    )
+                if skill_number < len(learning_missing):
+                    st.markdown("---")
+        else:
+            st.success(
+                "🎉 No missing skills for this job. You are ready for this skill set!"
+            )
 
 
 
