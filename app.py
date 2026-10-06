@@ -8,6 +8,15 @@ import ast
 from io import BytesIO
 from urllib.parse import quote_plus
 
+# Optional library for course certificates
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.pdfgen import canvas
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
+
 # Optional libraries for Resume + NLP features
 try:
     import pdfplumber
@@ -78,6 +87,15 @@ if "recommendations" not in st.session_state:
 
 if "recommendation_source" not in st.session_state:
     st.session_state.recommendation_source = "Manual Skills"
+
+if "course_progress" not in st.session_state:
+    st.session_state.course_progress = {}
+
+if "course_quiz_results" not in st.session_state:
+    st.session_state.course_quiz_results = {}
+
+if "course_certificates" not in st.session_state:
+    st.session_state.course_certificates = {}
 
 
 # =====================================================
@@ -683,6 +701,311 @@ def youtube_search_url(skill):
 
 
 # =====================================================
+# SKILL COURSE COMPLETION SYSTEM
+# =====================================================
+
+COURSE_TEMPLATES = {
+    "python": {
+        "title": "Python Fundamentals",
+        "level": "Beginner",
+        "duration": "3–4 hours",
+        "modules": [
+            ("Python Basics", "Learn variables, data types, operators and basic syntax.", "name = 'Alex'\nage = 20\nprint(name, age)", "Create variables for your name, age and city and print them."),
+            ("Conditions & Loops", "Learn if/else conditions and for/while loops for decision making and repetition.", "for i in range(1, 6):\n    print(i)", "Print numbers from 1 to 10 and display whether each number is even or odd."),
+            ("Functions & Collections", "Learn functions and common Python collections such as lists and dictionaries.", "def add(a, b):\n    return a + b", "Create a function that accepts a list of numbers and returns the largest value."),
+            ("Practical Python", "Combine the concepts to build a small useful program and handle basic errors.", "skills = ['Python', 'SQL']\nfor skill in skills:\n    print(skill)", "Build a small skill tracker that stores five skills and displays them."),
+        ],
+        "quiz": [
+            ("Which keyword defines a function in Python?", ["function", "def", "fun", "define"], "B"),
+            ("Which collection stores key-value pairs?", ["List", "Tuple", "Dictionary", "Set"], "C"),
+            ("What does len() return?", ["The last item", "The number of items", "The data type", "The memory size"], "B"),
+            ("Which symbol starts a comment in Python?", ["//", "<!--", "#", "/*"], "C"),
+            ("Which loop is commonly used to iterate over a sequence?", ["for", "switch", "case", "goto"], "A"),
+        ],
+    },
+    "sql": {
+        "title": "SQL for Data Analysis", "level": "Beginner", "duration": "3–4 hours",
+        "modules": [
+            ("SQL Basics", "Understand databases, tables, rows, columns and SELECT queries.", "SELECT name, salary\nFROM employees;", "Write a query to display all columns from a students table."),
+            ("Filtering & Sorting", "Use WHERE, AND, OR, IN, LIKE and ORDER BY to filter data.", "SELECT * FROM employees\nWHERE salary > 50000\nORDER BY salary DESC;", "Find employees from the IT department with salary above 40000."),
+            ("Aggregations", "Use COUNT, SUM, AVG, MIN, MAX and GROUP BY to summarize data.", "SELECT department, AVG(salary)\nFROM employees\nGROUP BY department;", "Calculate the average salary for every department."),
+            ("Joins & Practical Queries", "Combine related tables using joins and build useful analytical queries.", "SELECT e.name, d.department_name\nFROM employees e\nJOIN departments d ON e.department_id = d.id;", "Join two sample tables and display a person's name with their department."),
+        ],
+        "quiz": [
+            ("Which command retrieves data?", ["SELECT", "INSERT", "DELETE", "DROP"], "A"),
+            ("Which clause filters rows?", ["GROUP BY", "WHERE", "ORDER BY", "JOIN"], "B"),
+            ("Which function calculates an average?", ["COUNT", "SUM", "AVG", "MAX"], "C"),
+            ("Which clause groups records?", ["GROUP BY", "WHERE", "VALUES", "SET"], "A"),
+            ("Which operation combines related tables?", ["JOIN", "SORT", "PRINT", "LOOP"], "A"),
+        ],
+    },
+    "pandas": {
+        "title": "Pandas for Data Analysis", "level": "Beginner", "duration": "3–4 hours",
+        "modules": [
+            ("Series & DataFrames", "Understand the basic Pandas structures used for tabular data.", "import pandas as pd\ndf = pd.DataFrame({'Name':['A','B'], 'Score':[80,90]})", "Create a DataFrame containing five students and their marks."),
+            ("Reading & Inspecting Data", "Learn to load CSV data and inspect rows, columns, types and missing values.", "df = pd.read_csv('data.csv')\nprint(df.head())", "Load a CSV and display its first five rows and column names."),
+            ("Cleaning Data", "Handle missing values, duplicates and inconsistent text values.", "df = df.drop_duplicates()\ndf['Name'] = df['Name'].str.strip()", "Remove duplicate rows and clean whitespace from a text column."),
+            ("Filtering & Analysis", "Filter records, select columns and calculate useful statistics.", "result = df[df['Score'] >= 70]", "Filter students scoring 70 or above and calculate their average score."),
+        ],
+        "quiz": [
+            ("Which library provides DataFrame?", ["NumPy", "Pandas", "Matplotlib", "Flask"], "B"),
+            ("Which function reads CSV?", ["read_csv", "load_csv", "open_csv", "csv_read"], "A"),
+            ("Which method removes duplicates?", ["drop_duplicates", "remove_rows", "unique_rows", "delete_duplicates"], "A"),
+            ("Which attribute gives column names?", ["df.columns", "df.names", "df.fields", "df.headers"], "A"),
+            ("Which method shows the first rows?", ["tail", "head", "first", "top"], "B"),
+        ],
+    },
+    "machine learning": {
+        "title": "Machine Learning Fundamentals", "level": "Beginner", "duration": "4–5 hours",
+        "modules": [
+            ("ML Concepts", "Understand supervised, unsupervised and reinforcement learning at a basic level.", "X = [[1], [2], [3]]\ny = [2, 4, 6]", "Classify a simple real-world problem as supervised or unsupervised learning."),
+            ("Data Preparation", "Learn features, labels, train-test split and basic preprocessing.", "from sklearn.model_selection import train_test_split\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)", "Identify the features and target variable in a student performance dataset."),
+            ("Model Training", "Understand fitting a model and making predictions.", "model.fit(X_train, y_train)\npredictions = model.predict(X_test)", "Train a simple regression or classification model on a small dataset."),
+            ("Evaluation", "Learn why accuracy and other evaluation metrics are important.", "accuracy = (predictions == y_test).mean()", "Compare two model results and explain which one performs better and why."),
+        ],
+        "quiz": [
+            ("What is a feature?", ["Input variable", "Final report", "Password", "Output format"], "A"),
+            ("Which learning type uses labelled data?", ["Supervised", "Unsupervised", "Random", "Manual"], "A"),
+            ("What does fit() generally do?", ["Deletes data", "Trains the model", "Prints data", "Creates a database"], "B"),
+            ("Why split train and test data?", ["To test generalization", "To increase file size", "To remove labels", "To rename columns"], "A"),
+            ("Accuracy is mainly used for?", ["Measuring predictions", "Sorting files", "Creating folders", "Parsing PDFs"], "A"),
+        ],
+    },
+    "java": {
+        "title": "Java Programming Fundamentals", "level": "Beginner", "duration": "4–5 hours",
+        "modules": [
+            ("Java Basics", "Learn classes, main method, variables and primitive data types.", "public class Main {\n  public static void main(String[] args) {\n    int age = 20;\n  }\n}", "Create a Java program that stores and prints a student's name and marks."),
+            ("Conditions & Loops", "Use if/else, switch and loops to control program flow.", "for(int i=1; i<=5; i++){\n    System.out.println(i);\n}", "Print the first ten even numbers using a loop."),
+            ("Methods & Arrays", "Create reusable methods and work with arrays.", "static int add(int a, int b){\n    return a+b;\n}", "Write a method that returns the largest value in an integer array."),
+            ("OOP Basics", "Understand classes, objects, constructors and encapsulation.", "class Student {\n    String name;\n}", "Create a Student class with two properties and one method."),
+        ],
+        "quiz": [
+            ("Which method is the entry point of a Java program?", ["start()", "main()", "run()", "begin()"], "B"),
+            ("Which keyword creates a class?", ["class", "object", "define", "struct"], "A"),
+            ("Which concept hides internal data?", ["Encapsulation", "Compilation", "Iteration", "Casting"], "A"),
+            ("Which structure repeats code?", ["Loop", "Package", "Import", "Class"], "A"),
+            ("An object is an instance of a...", ["Method", "Class", "Loop", "Variable"], "B"),
+        ],
+    },
+    "javascript": {
+        "title": "JavaScript Fundamentals", "level": "Beginner", "duration": "3–4 hours",
+        "modules": [
+            ("JavaScript Basics", "Learn variables, data types and operators.", "const name = 'Alex';\nlet age = 20;", "Create variables for a user's name, age and course."),
+            ("Conditions & Functions", "Use conditions and functions to build reusable logic.", "function add(a, b) { return a + b; }", "Create a function that checks whether a number is even."),
+            ("Arrays & Objects", "Store structured data using arrays and objects.", "const student = {name:'A', score:85};", "Create an array of three student objects."),
+            ("DOM Basics", "Understand how JavaScript can interact with HTML elements.", "document.getElementById('title').textContent = 'Hello';", "Change the text of an HTML element using JavaScript."),
+        ],
+        "quiz": [
+            ("Which keyword declares a constant?", ["const", "fixed", "constant", "let"], "A"),
+            ("Which method selects an element by ID?", ["getElementById", "selectId", "findId", "idElement"], "A"),
+            ("Which structure stores key-value pairs?", ["Object", "Loop", "Function", "String"], "A"),
+            ("Which keyword defines a function traditionally?", ["function", "def", "fun", "method"], "A"),
+            ("Which symbol is commonly used for strict equality?", ["=", "==", "===", "=>"], "C"),
+        ],
+    },
+}
+
+
+def normalize_course_key(skill):
+    s = clean_skill(skill)
+    aliases = {
+        "python 3": "python", "python programming": "python",
+        "sql server": "sql", "mysql": "sql", "mysql workbench": "sql",
+        "pandas library": "pandas", "pandas dataframe": "pandas",
+        "ml": "machine learning", "machinelearning": "machine learning",
+        "java programming": "java", "javascript programming": "javascript",
+        "js": "javascript",
+    }
+    if s in COURSE_TEMPLATES:
+        return s
+    if s in aliases:
+        return aliases[s]
+    for key in COURSE_TEMPLATES:
+        if key in s or s in key:
+            return key
+    return "generic"
+
+
+def build_generic_course(skill):
+    title = skill.title()
+    return {
+        "title": f"{title} Skill Development",
+        "level": "Beginner",
+        "duration": "2–3 hours",
+        "modules": [
+            (f"Introduction to {title}", f"Understand the purpose, terminology and common uses of {title}.", f"Skill: {title}\nGoal: understand the fundamentals", f"Write five important concepts or uses of {title}."),
+            (f"Core Concepts of {title}", f"Study the fundamental concepts and workflow used when working with {title}.", f"{title} workflow → Input → Process → Output", f"Describe the basic workflow of {title} in your own words."),
+            (f"Practical {title}", f"Apply the skill to a small practical task related to your career goal.", f"Practice task: Build a small example using {title}.", f"Create one small practical example using {title}."),
+            (f"Job-Oriented Practice", f"Connect {title} with a real job requirement and identify what you need to practise further.", f"Job Skill: {title}\nPractice → Test → Improve", f"Find one job-related task where {title} would be useful and explain it."),
+        ],
+        "quiz": [
+            (f"What is the main goal of learning {title}?", ["Build practical skill", "Avoid practice", "Delete data", "Only memorize terms"], "A"),
+            (f"Which approach is best for improving {title}?", ["Practice regularly", "Never practise", "Skip examples", "Only read titles"], "A"),
+            (f"Where can {title} be useful?", ["Real projects", "Only games", "Only passwords", "Nowhere"], "A"),
+            ("What should you do after learning a concept?", ["Apply it", "Forget it", "Delete it", "Avoid examples"], "A"),
+            ("What helps confirm your understanding?", ["Practice and assessment", "Skipping all tasks", "Only opening the page", "No activity"], "A"),
+        ],
+    }
+
+
+def get_course_for_skill(skill):
+    key = normalize_course_key(skill)
+    if key == "generic":
+        return f"generic::{clean_skill(skill)}", build_generic_course(skill)
+    return key, COURSE_TEMPLATES[key]
+
+
+def certificate_pdf_bytes(user_name, course_title, skill, score):
+    if not HAS_REPORTLAB:
+        return None
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+    certificate_id = f"CMAI-{hashlib.sha256((user_name + course_title + skill).encode()).hexdigest()[:10].upper()}"
+    c.setStrokeColor(colors.HexColor("#2E5AAC"))
+    c.setLineWidth(4)
+    c.rect(28, 28, width - 56, height - 56)
+    c.setLineWidth(1)
+    c.rect(40, 40, width - 80, height - 80)
+    c.setFillColor(colors.HexColor("#1F2937"))
+    c.setFont("Helvetica-Bold", 30)
+    c.drawCentredString(width / 2, height - 105, "CERTIFICATE OF COMPLETION")
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(width / 2, height - 135, "CareerMatch AI • Skill Development Program")
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(width / 2, height - 195, "This certificate is proudly presented to")
+    c.setFillColor(colors.HexColor("#111827"))
+    c.setFont("Helvetica-Bold", 25)
+    c.drawCentredString(width / 2, height - 235, user_name)
+    c.setFillColor(colors.HexColor("#374151"))
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(width / 2, height - 275, "for successfully completing the course")
+    c.setFont("Helvetica-Bold", 20)
+    c.drawCentredString(width / 2, height - 310, course_title)
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(width / 2, height - 340, f"Skill: {skill.title()}   •   Final Assessment: {score}%")
+    c.setFont("Helvetica", 11)
+    c.drawCentredString(width / 2, 85, f"Certificate ID: {certificate_id}   •   Completion Date: {pd.Timestamp.now().strftime('%d %B %Y')}")
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue(), certificate_id
+
+
+def show_skill_course_center(resource_items):
+    if not resource_items:
+        return
+
+    st.divider()
+    st.subheader("🎓 Skill Courses & Certification")
+    st.write(
+        "Every missing skill identified for your Top 5 job recommendations has a related "
+        "course. Complete the modules, pass the assessment, and download your certificate."
+    )
+
+    # Unique job-skill pairs keep the course tied to the exact recommendation and gap.
+    unique_items = []
+    seen = set()
+    for job_title, skill in resource_items:
+        pair = (job_title, clean_skill(skill))
+        if pair not in seen:
+            seen.add(pair)
+            unique_items.append(pair)
+
+    labels = [f"{job} → {skill.title()}" for job, skill in unique_items]
+    selected_label = st.selectbox(
+        "📚 Select a required skill to start its course",
+        labels,
+        key="skill_course_selector"
+    )
+    selected_index = labels.index(selected_label)
+    job_title, skill = unique_items[selected_index]
+    course_key, course = get_course_for_skill(skill)
+    state_key = f"{job_title}::{skill}::{course_key}"
+
+    st.markdown(f"### 🎯 {course['title']}")
+    st.caption(f"Recommended for: {job_title}  •  Required skill: {skill.title()}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Level", course["level"])
+    c2.metric("Modules", len(course["modules"]))
+    c3.metric("Duration", course["duration"])
+
+    if state_key not in st.session_state.course_progress:
+        st.session_state.course_progress[state_key] = set()
+    completed = st.session_state.course_progress[state_key]
+
+    progress = len(completed) / len(course["modules"])
+    st.progress(progress)
+    st.caption(f"Course Progress: {len(completed)}/{len(course['modules'])} modules completed")
+
+    for i, (title, lesson, example, practice) in enumerate(course["modules"]):
+        done = i in completed
+        with st.expander(f"{'✅' if done else '📘'} Module {i+1}: {title}", expanded=(i == 0 and not done)):
+            st.markdown("**Lesson**")
+            st.write(lesson)
+            st.markdown("**Example**")
+            st.code(example, language="text")
+            st.markdown("**Practice Task**")
+            st.write(practice)
+            if done:
+                st.success("Module completed.")
+            else:
+                if st.button("✅ Mark Module Complete", key=f"complete_{hashlib.md5((state_key+str(i)).encode()).hexdigest()}", use_container_width=True):
+                    completed.add(i)
+                    st.session_state.course_progress[state_key] = completed
+                    st.rerun()
+
+    if len(completed) == len(course["modules"]):
+        st.success("🎉 All modules completed. You can now take the final assessment.")
+        quiz_state_key = state_key + "::quiz"
+        score_state_key = state_key + "::score"
+
+        st.markdown("### 📝 Final Skill Assessment")
+        answers = []
+        for i, (question, options, correct) in enumerate(course["quiz"]):
+            answers.append(st.radio(question, options, index=None, key=f"quiz_{hashlib.md5((state_key+str(i)).encode()).hexdigest()}"))
+
+        if st.button("🎯 Submit Assessment", key=f"submit_{hashlib.md5(state_key.encode()).hexdigest()}", type="primary", use_container_width=True):
+            if any(answer is None for answer in answers):
+                st.warning("Please answer all questions before submitting.")
+            else:
+                score = sum(1 for answer, (_, options, correct) in zip(answers, course["quiz"]) if answer == options[ord(correct)-65])
+                percent = int(score / len(course["quiz"]) * 100)
+                st.session_state.course_quiz_results[quiz_state_key] = score >= 4
+                st.session_state.course_quiz_results[score_state_key] = percent
+                if score >= 4:
+                    st.success(f"🏆 Passed: {score}/5 ({percent}%). Certificate unlocked!")
+                else:
+                    st.warning(f"Score: {score}/5 ({percent}%). You need at least 4/5. Review the modules and try again.")
+
+        if st.session_state.course_quiz_results.get(quiz_state_key, False):
+            score = st.session_state.course_quiz_results.get(score_state_key, 80)
+            st.markdown("### 🏆 Skill Course Completed")
+            st.success(f"You completed **{course['title']}** for **{skill.title()}** with **{score}%**.")
+            certificate_name = st.text_input("👤 Name for Certificate", key=f"certificate_name_{hashlib.md5(state_key.encode()).hexdigest()}")
+            if not HAS_REPORTLAB:
+                st.error("Certificate generation requires reportlab. Add `reportlab` to requirements.txt.")
+            elif st.button("📜 Generate Certificate", key=f"certificate_{hashlib.md5(state_key.encode()).hexdigest()}", use_container_width=True):
+                if not certificate_name.strip():
+                    st.warning("Please enter your name first.")
+                else:
+                    pdf_data, certificate_id = certificate_pdf_bytes(certificate_name.strip(), course["title"], skill, score)
+                    st.session_state.course_certificates[state_key] = (pdf_data, certificate_id)
+                    st.success(f"Certificate generated successfully. ID: {certificate_id}")
+
+            certificate = st.session_state.course_certificates.get(state_key)
+            if certificate:
+                pdf_data, certificate_id = certificate
+                st.download_button(
+                    "📥 Download / Print Certificate",
+                    data=pdf_data,
+                    file_name=f"CareerMatch_{clean_skill(skill).replace(' ', '_')}_Certificate.pdf",
+                    mime="application/pdf",
+                    key=f"download_{hashlib.md5((state_key+'download').encode()).hexdigest()}",
+                    use_container_width=True
+                )
+
+
+# =====================================================
 # MAIN JOB SEARCH
 # POSITION INPUT REMOVED
 # =====================================================
@@ -1107,42 +1430,72 @@ if recommendations is not None and not recommendations.empty:
 
 
 # =====================================================
-# YOUTUBE LEARNING — SEPARATE SECTION
+# LEARNING RESOURCES — YOUTUBE + COURSE FOR EVERY GAP
 # =====================================================
 
-if (
-    recommendations is not None
-    and not recommendations.empty
-):
+if recommendations is not None and not recommendations.empty:
 
     st.divider()
-    st.subheader("▶️ Learning Recommendations")
-
+    st.subheader("📚 Skill Improvement Resources")
     st.write(
-        "Use these YouTube search links to learn the skills "
-        "identified in your skill gap."
+        "For every missing skill in your Top 5 recommendations, CareerMatch AI provides "
+        "a YouTube learning link and an in-app skill course with assessment and certification."
     )
 
-    learning_missing = sorted(
-        selected_row["missing_skills"]
-    )
+    course_resource_items = []
 
-    if learning_missing:
+    for job_number, (_, resource_row) in enumerate(
+        recommendations.iterrows(),
+        start=1
+    ):
+        required = extract_required_skills(resource_row["job_skill_set"])
+        candidate = set(combined_skill_set)
+        resource_missing = sorted(required.difference(candidate))
 
-        for skill in learning_missing[:8]:
-            url = youtube_search_url(skill)
+        with st.expander(
+            f"💼 Job {job_number}: {resource_row['job_title']} — Skill Resources",
+            expanded=False
+        ):
+            if resource_missing:
+                st.caption(
+                    f"{len(resource_missing)} skill(s) to improve for this job"
+                )
 
-            st.markdown(
-                f"""
-**{skill.title()}**
+                for missing_skill in resource_missing:
+                    course_resource_items.append(
+                        (resource_row["job_title"], missing_skill)
+                    )
 
-[▶️ Learn {skill.title()} on YouTube]({url})
-"""
-            )
+                    youtube_url = youtube_search_url(missing_skill)
+                    course_key, course_info = get_course_for_skill(missing_skill)
 
+                    st.markdown(f"### 🛠️ {missing_skill.title()}")
+                    st.write(
+                        f"🎓 **Related Course:** {course_info['title']} "
+                        f"• {course_info['duration']}"
+                    )
+                    r1, r2 = st.columns(2)
+                    with r1:
+                        st.link_button(
+                            f"▶️ Learn {missing_skill.title()} on YouTube",
+                            youtube_url,
+                            use_container_width=True
+                        )
+                    with r2:
+                        st.info(
+                            "🎓 Select this skill in the Course Completion Center below "
+                            "to start the course and earn a certificate."
+                        )
+                    st.markdown("---")
+            else:
+                st.success("🎉 No missing skills for this job. You are ready for this skill set!")
+
+    if course_resource_items:
+        show_skill_course_center(course_resource_items)
     else:
         st.success(
-            "No missing skills found. Keep improving your current skills!"
+            "🎉 You currently have all directly required skills for the Top 5 recommendations, "
+            "so there are no skill courses to complete."
         )
 
 
