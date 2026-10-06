@@ -79,10 +79,6 @@ if "recommendations" not in st.session_state:
 if "recommendation_source" not in st.session_state:
     st.session_state.recommendation_source = "Manual Skills"
 
-# --- NEW: Course Completion Session State ---
-if "completed_skills" not in st.session_state:
-    st.session_state.completed_skills = set()
-
 
 # =====================================================
 # LOGIN SYSTEM
@@ -504,6 +500,7 @@ def extract_skills_from_resume(raw_text, dataset_skills):
     text = raw_text.lower()
     found = set()
 
+    # Longest skills first reduces partial-match issues.
     for skill in sorted(
         dataset_skills,
         key=len,
@@ -512,6 +509,7 @@ def extract_skills_from_resume(raw_text, dataset_skills):
         if not skill:
             continue
 
+        # Flexible spaces between words.
         pattern = r"(?<!\w)" + re.escape(skill).replace(
             r"\ ",
             r"\s+"
@@ -550,6 +548,8 @@ def calculate_semantic_score(
             embeddings[1]
         ).item()
 
+        # Cosine similarity can theoretically be below 0.
+        # Convert to a safe 0-100 score.
         return round(
             max(0.0, min(1.0, similarity)) * 100,
             2
@@ -561,6 +561,7 @@ def calculate_semantic_score(
 
 # =====================================================
 # CORE RECOMMENDATION ENGINE
+# POSITION INPUT REMOVED
 # =====================================================
 
 def get_recommendations(
@@ -591,6 +592,7 @@ def get_recommendations(
         if not required_skills:
             continue
 
+        # DIRECT SKILL SCORE
         (
             skill_score,
             precision_percentage,
@@ -601,7 +603,11 @@ def get_recommendations(
             required_skills
         )
 
+        # Position input removed.
+        # Skill score is now the main direct matching score.
         original_final_score = skill_score
+
+        # NEW AI/NLP SCORE
         semantic_score = 0.0
 
         if semantic_enabled:
@@ -612,6 +618,7 @@ def get_recommendations(
                 required_skills
             )
 
+        # AI-assisted score
         ai_assisted_score = (
             original_final_score * 0.75
             + semantic_score * 0.25
@@ -648,6 +655,7 @@ def get_recommendations(
         right_on="index"
     )
 
+    # Rank based on skill matching.
     recommendations = (
         recommendations
         .sort_values(
@@ -676,6 +684,7 @@ def youtube_search_url(skill):
 
 # =====================================================
 # MAIN JOB SEARCH
+# POSITION INPUT REMOVED
 # =====================================================
 
 st.subheader("🔎 Find Your Job")
@@ -685,6 +694,8 @@ st.info(
     "and click **FIND MY TOP 5 JOBS**."
 )
 
+
+# STEP 1
 st.markdown("### 1️⃣ Select Your Career Category")
 
 categories = sorted(
@@ -705,6 +716,8 @@ category = st.selectbox(
     categories
 )
 
+
+# STEP 2
 st.markdown("### 2️⃣ Enter Your Skills")
 
 user_skills = st.text_input(
@@ -721,7 +734,7 @@ st.caption(
 
 
 # =====================================================
-# RESUME FEATURE
+# RESUME FEATURE — SEPARATE SECTION
 # =====================================================
 
 st.divider()
@@ -828,16 +841,14 @@ st.divider()
 st.subheader("🎯 Find Your Jobs")
 
 st.write(
-    "Your manual skills, extracted resume skills, and completed course skills can be used together."
+    "Your manual skills and extracted resume skills can be used together."
 )
 
+# Combine manual + resume skills without changing dataset.
 manual_set = extract_user_skills(user_skills)
 combined_skill_set = manual_set.union(
     st.session_state.resume_skills
-).union(
-    st.session_state.completed_skills
 )
-
 combined_skills_text = ", ".join(
     sorted(combined_skill_set)
 )
@@ -872,7 +883,8 @@ if st.button(
         st.session_state.recommendations = recommendations
         st.session_state.recommendation_source = (
             "Manual + Resume Skills"
-            if st.session_state.resume_skills and manual_set
+            if st.session_state.resume_skills
+            and manual_set
             else "Resume Skills"
             if st.session_state.resume_skills
             else "Manual Skills"
@@ -1015,7 +1027,7 @@ if recommendations is not None:
 
 
 # =====================================================
-# SKILL GAP ANALYSIS
+# SKILL GAP ANALYSIS — SEPARATE SECTION
 # =====================================================
 
 if recommendations is not None and not recommendations.empty:
@@ -1044,11 +1056,11 @@ if recommendations is not None and not recommendations.empty:
     ].iloc[0]
 
     matched = sorted(
-        selected_row["matched_skills"].union(st.session_state.completed_skills.intersection(selected_row["missing_skills"]))
+        selected_row["matched_skills"]
     )
 
     missing = sorted(
-        selected_row["missing_skills"] - st.session_state.completed_skills
+        selected_row["missing_skills"]
     )
 
     left, right = st.columns(2)
@@ -1095,7 +1107,7 @@ if recommendations is not None and not recommendations.empty:
 
 
 # =====================================================
-# YOUTUBE LEARNING + NEW: COURSE COMPLETION FEATURE
+# YOUTUBE LEARNING — SEPARATE SECTION
 # =====================================================
 
 if (
@@ -1104,45 +1116,51 @@ if (
 ):
 
     st.divider()
-    st.subheader("▶️ Learning & Course Completion Tracker")
+    st.subheader("▶️ Learning Recommendations")
 
     st.write(
-        "Use these learning links to acquire missing skills. "
-        "Once completed, mark them to update your profile and job match scores!"
+        "Use these YouTube search links to learn the skills "
+        "identified in your skill gap."
     )
 
     learning_missing = sorted(
-        selected_row["missing_skills"] - st.session_state.completed_skills
+        selected_row["missing_skills"]
     )
 
-    # Calculate overall skill gap completion progress
-    total_gap_skills = len(selected_row["missing_skills"])
-    completed_gap_skills = len(st.session_state.completed_skills.intersection(selected_row["missing_skills"]))
-    
-    if total_gap_skills > 0:
-        completion_pct = int((completed_gap_skills / total_gap_skills) * 100)
-    else:
-        completion_pct = 100
-
-    st.markdown(f"### 📊 Skill Gap Learning Progress: **{completion_pct}%**")
-    st.progress(completion_pct)
-
     if learning_missing:
-
-        st.write("---")
-        st.markdown("#### 🎓 Available Skill Courses:")
-
-        newly_completed = []
 
         for skill in learning_missing[:8]:
             url = youtube_search_url(skill)
 
-            col1, col2 = st.columns([3, 1])
+            st.markdown(
+                f"""
+**{skill.title()}**
 
-            with col1:
-                st.markdown(
-                    f"**{skill.title()}**  \n"
-                    f"[▶️ Learn {skill.title()} on YouTube]({url})"
-                )
+[▶️ Learn {skill.title()} on YouTube]({url})
+"""
+            )
 
-            with
+    else:
+        st.success(
+            "No missing skills found. Keep improving your current skills!"
+        )
+
+
+# =====================================================
+# FOOTER
+# =====================================================
+
+st.markdown("---")
+
+st.markdown(
+    """
+<div class="footer">
+    <b>💼 CareerMatch AI</b>
+    <br>
+    AI-Assisted Smart Job Recommendation System
+    <br><br>
+    Built with Python • Pandas • Streamlit • NLP
+</div>
+""",
+    unsafe_allow_html=True
+)
