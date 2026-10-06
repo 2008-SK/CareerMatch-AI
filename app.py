@@ -1383,14 +1383,368 @@ def show_history():
             st.info("No course has been completed yet.")
 
 
+
+# =====================================================
+# INTERVIEW PREPARATION
+# =====================================================
+
+INTERVIEW_QUESTIONS = {
+    "General / HR": [
+        {
+            "q": "Tell me about yourself.",
+            "answer": "Give a short introduction covering your education, key skills, project or internship experience, strengths, and the type of role you want.",
+            "keywords": ["education", "skills", "project", "internship", "strength", "career", "role"]
+        },
+        {
+            "q": "Why should we hire you?",
+            "answer": "Connect your strongest skills and practical experience with the requirements of the role and explain how you can contribute to the organization.",
+            "keywords": ["skills", "experience", "learn", "contribute", "team", "role"]
+        },
+        {
+            "q": "What are your strengths?",
+            "answer": "Mention two or three relevant strengths and support them with a short example from academics, projects, internship, or teamwork.",
+            "keywords": ["strength", "problem solving", "communication", "teamwork", "learning", "adapt"]
+        },
+        {
+            "q": "Where do you see yourself in five years?",
+            "answer": "Show a realistic growth plan: stronger technical or professional skills, more responsibility, meaningful contribution, and continuous learning.",
+            "keywords": ["growth", "skills", "learning", "responsibility", "career", "contribute"]
+        },
+        {
+            "q": "Describe a challenge you faced and how you solved it.",
+            "answer": "Use the STAR structure: Situation, Task, Action, and Result. Focus on your own actions and the outcome.",
+            "keywords": ["situation", "task", "action", "result", "problem", "solution"]
+        }
+    ],
+    "Information Technology": [
+        {
+            "q": "Explain one technical project you have worked on.",
+            "answer": "Explain the problem, technologies used, your role, important features, challenges, and final result in a clear sequence.",
+            "keywords": ["problem", "technology", "python", "project", "features", "role", "result"]
+        },
+        {
+            "q": "What is the difference between supervised and unsupervised learning?",
+            "answer": "Supervised learning uses labelled data to learn a mapping for prediction or classification, while unsupervised learning works with unlabelled data to discover patterns such as clusters.",
+            "keywords": ["supervised", "unsupervised", "labelled", "unlabelled", "classification", "clustering"]
+        },
+        {
+            "q": "What is SQL and why is it used?",
+            "answer": "SQL is a language used to store, retrieve, update, and manage data in relational databases. It is commonly used for querying and analysing structured data.",
+            "keywords": ["sql", "database", "query", "data", "table", "relational"]
+        },
+        {
+            "q": "What is the purpose of data preprocessing?",
+            "answer": "Data preprocessing improves data quality by handling missing values, duplicates, inconsistent formats, irrelevant data, and other issues before analysis or machine learning.",
+            "keywords": ["preprocessing", "missing", "duplicate", "clean", "data", "quality"]
+        },
+        {
+            "q": "Why is testing important in software development?",
+            "answer": "Testing helps find defects, verify that requirements are met, reduce failures, and improve the reliability and quality of software.",
+            "keywords": ["testing", "bugs", "requirements", "quality", "reliability", "software"]
+        }
+    ],
+    "Business Development": [
+        {
+            "q": "How would you identify a new business opportunity?",
+            "answer": "Study customer needs, market trends, competitors, gaps in existing solutions, and the potential value of the opportunity before proposing an approach.",
+            "keywords": ["customer", "market", "trend", "competitor", "need", "opportunity"]
+        },
+        {
+            "q": "How would you handle a difficult client?",
+            "answer": "Listen carefully, understand the concern, communicate calmly, offer realistic solutions, and follow up to make sure the issue is resolved.",
+            "keywords": ["listen", "client", "communication", "solution", "follow", "resolve"]
+        },
+        {
+            "q": "What is lead generation?",
+            "answer": "Lead generation is the process of identifying and attracting potential customers who may be interested in a product or service.",
+            "keywords": ["lead", "customer", "potential", "product", "service", "interest"]
+        }
+    ],
+    "Finance": [
+        {
+            "q": "Why is financial data analysis important?",
+            "answer": "It helps organizations understand performance, control costs, identify trends, manage risks, and make informed financial decisions.",
+            "keywords": ["financial", "data", "analysis", "cost", "risk", "decision", "trend"]
+        },
+        {
+            "q": "What is the difference between revenue and profit?",
+            "answer": "Revenue is the total income generated from business activities, while profit is the amount remaining after deducting relevant expenses from revenue.",
+            "keywords": ["revenue", "profit", "income", "expenses", "business"]
+        },
+        {
+            "q": "How can Excel help in finance?",
+            "answer": "Excel can be used for calculations, financial models, budgeting, forecasting, data analysis, dashboards, and reporting.",
+            "keywords": ["excel", "calculation", "budget", "forecast", "analysis", "report"]
+        }
+    ],
+    "HR": [
+        {
+            "q": "What is the role of HR in an organization?",
+            "answer": "HR manages people-related processes such as recruitment, onboarding, employee development, performance, engagement, and workplace policies.",
+            "keywords": ["hr", "recruitment", "employee", "development", "performance", "engagement"]
+        },
+        {
+            "q": "How would you handle a conflict between two employees?",
+            "answer": "Listen to both sides objectively, understand the facts, encourage respectful communication, identify a fair solution, and follow up afterwards.",
+            "keywords": ["conflict", "listen", "employee", "communication", "fair", "solution"]
+        },
+        {
+            "q": "What is employee onboarding?",
+            "answer": "Onboarding is the process of helping a new employee understand the organization, role, team, policies, tools, and expectations so they can become productive.",
+            "keywords": ["onboarding", "employee", "role", "team", "policy", "training"]
+        }
+    ],
+    "Sales": [
+        {
+            "q": "How would you convince a customer to consider a product?",
+            "answer": "First understand the customer's needs, then explain the product's relevant benefits, handle objections honestly, and guide the customer toward a suitable decision.",
+            "keywords": ["customer", "needs", "product", "benefits", "objection", "communication"]
+        },
+        {
+            "q": "What is the difference between a lead and a customer?",
+            "answer": "A lead is a potential customer who may be interested in a product or service, while a customer has actually purchased or engaged with the offering.",
+            "keywords": ["lead", "customer", "potential", "purchase", "product", "service"]
+        },
+        {
+            "q": "How do you handle rejection in sales?",
+            "answer": "Stay professional, understand the reason for rejection, learn from it, improve the approach when appropriate, and continue working with other prospects.",
+            "keywords": ["rejection", "professional", "reason", "learn", "improve", "prospect"]
+        }
+    ]
+}
+
+
+def interview_feedback(answer, question_data):
+    text = (answer or "").strip()
+    if not text:
+        return 0, [], "Please write your answer first."
+
+    words = re.findall(r"[a-zA-Z0-9+#.]+", text.lower())
+    word_count = len(words)
+    answer_words = set(words)
+    keywords = set(k.lower() for k in question_data.get("keywords", []))
+    matched = sorted(answer_words.intersection(keywords))
+    keyword_score = min(70, int((len(matched) / max(1, min(5, len(keywords)))) * 70))
+    length_score = 20 if word_count >= 45 else 15 if word_count >= 25 else 8 if word_count >= 12 else 3
+
+    semantic_score = 0
+    if nlp_model and text:
+        try:
+            emb = nlp_model.encode([text, question_data["answer"]], convert_to_tensor=True)
+            semantic_score = int(float(util.cos_sim(emb[0], emb[1]).item()) * 100)
+            semantic_score = max(0, min(100, semantic_score))
+        except Exception:
+            semantic_score = 0
+
+    if semantic_score:
+        score = int(keyword_score * 0.45 + length_score + semantic_score * 0.35)
+    else:
+        score = keyword_score + length_score
+    score = max(0, min(100, score))
+
+    if score >= 80:
+        feedback = "Excellent answer. Keep it concise and support it with a real example when possible."
+    elif score >= 60:
+        feedback = "Good start. Add a specific example and connect your answer more directly to the role."
+    elif score >= 40:
+        feedback = "Needs improvement. Include more relevant points and explain your actions or reasoning clearly."
+    else:
+        feedback = "Try again. Structure the answer around the question and include relevant skills, examples, or results."
+
+    return score, matched, feedback
+
+
+def build_job_interview_questions(job_title, category, required_skills, missing_skills):
+    """Build interview practice questions directly from a recommended job."""
+    clean_required = [str(x).strip() for x in required_skills if str(x).strip()]
+    clean_missing = [str(x).strip() for x in missing_skills if str(x).strip()]
+
+    questions = [
+        {
+            "q": f"Why are you a good fit for the {job_title} role?",
+            "answer": (
+                f"Connect your strongest skills and experience with the {job_title} role. "
+                f"Mention relevant skills such as {', '.join(clean_required[:5]) or 'the required skills'} "
+                "and support your answer with a project, internship, or practical example."
+            ),
+            "keywords": clean_required[:8] + ["experience", "project", "skills", "role", "learn"]
+        },
+        {
+            "q": f"What technical or professional skills are important for a {job_title}?",
+            "answer": (
+                f"Explain the most important skills for the role: "
+                f"{', '.join(clean_required[:8]) or 'relevant role skills'}. "
+                "Explain how you have used some of them and how you plan to improve the others."
+            ),
+            "keywords": clean_required[:10] + ["skills", "experience", "improve"]
+        },
+        {
+            "q": f"How would you handle a real task in a {job_title} position?",
+            "answer": (
+                "First understand the requirement, break the task into smaller steps, select the appropriate "
+                "tools or skills, complete and test the work, and communicate the result clearly."
+            ),
+            "keywords": clean_required[:8] + ["task", "problem", "solution", "result", "test"]
+        },
+        {
+            "q": "Tell me about a project or practical experience related to this role.",
+            "answer": (
+                "Explain the problem, your role, technologies or skills used, important actions, challenges, "
+                "and the final result. Focus on what you personally contributed."
+            ),
+            "keywords": clean_required[:7] + ["project", "problem", "role", "result", "experience"]
+        }
+    ]
+
+    if clean_missing:
+        questions.append({
+            "q": f"You currently need to improve {clean_missing[0]}. How would you prepare for this skill?",
+            "answer": (
+                f"Acknowledge the gap and give a practical learning plan for {clean_missing[0]}: "
+                "learn the fundamentals, practise with small tasks or projects, review mistakes, "
+                "and apply the skill in a realistic example."
+            ),
+            "keywords": [clean_missing[0], "learn", "practice", "project", "improve", "fundamentals"]
+        })
+    else:
+        questions.append({
+            "q": "How would you use your matching skills to contribute from your first month?",
+            "answer": (
+                "Explain how you would understand the team's process, apply your existing skills to real tasks, "
+                "learn the organization's tools, and gradually take more responsibility."
+            ),
+            "keywords": clean_required[:8] + ["team", "skills", "contribute", "learn", "tasks"]
+        })
+
+    # Remove duplicate keywords while keeping the question set focused.
+    for q in questions:
+        q["keywords"] = list(dict.fromkeys([str(k).lower() for k in q["keywords"] if str(k).strip()]))
+    return questions
+
+
+def show_interview_preparation():
+    st.markdown("""
+    <div class="course-hero">
+        <h2>🎤 Interview Preparation Studio</h2>
+        <p>Prepare specifically for the jobs recommended to you — not generic interview questions.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    recommendations = st.session_state.get("recommendations")
+
+    if recommendations is None or recommendations.empty:
+        st.warning(
+            "🔎 First generate your Top 5 Job Recommendations. "
+            "Your interview preparation will then be created automatically from those jobs and their required skills."
+        )
+        st.info("Go to **💼 Job Recommendation**, enter your skills or upload your resume, and click **FIND MY TOP 5 JOBS**.")
+        return
+
+    st.success("🎯 Your interview preparation is now personalized to your recommended jobs.")
+
+    job_options = [row["job_title"] for _, row in recommendations.iterrows()]
+    selected_job = st.selectbox(
+        "💼 Select a Recommended Job to Prepare For",
+        job_options,
+        key="interview_job_selector"
+    )
+
+    selected_row = recommendations[recommendations["job_title"] == selected_job].iloc[0]
+    required_skills = extract_required_skills(selected_row["job_skill_set"])
+    matched_skills = sorted(selected_row["matched_skills"]) if isinstance(selected_row["matched_skills"], set) else []
+    missing_skills = sorted(selected_row["missing_skills"]) if isinstance(selected_row["missing_skills"], set) else []
+
+    st.markdown(f"### 🏆 Preparing for: {selected_job}")
+    st.caption(f"Category: {selected_row['category']} • Job Match: {float(selected_row['match_percentage']):.1f}%")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Job Match", f"{float(selected_row['match_percentage']):.1f}%")
+    c2.metric("Matching Skills", len(matched_skills))
+    c3.metric("Skills to Improve", len(missing_skills))
+
+    with st.expander("🛠️ Skills this interview will focus on", expanded=True):
+        st.write(", ".join(skill.title() for skill in required_skills) or "Role-specific skills")
+        if matched_skills:
+            st.success("Your matching skills: " + ", ".join(skill.title() for skill in matched_skills))
+        if missing_skills:
+            st.warning("Priority skill gaps: " + ", ".join(skill.title() for skill in missing_skills))
+
+    interview_questions = build_job_interview_questions(
+        selected_job,
+        selected_row["category"],
+        required_skills,
+        missing_skills
+    )
+
+    q_index = st.selectbox(
+        "📝 Choose a Job-Specific Interview Question",
+        range(len(interview_questions)),
+        format_func=lambda i: f"Question {i + 1}: {interview_questions[i]['q']}",
+        key=f"interview_question_{selected_job}"
+    )
+
+    q_data = interview_questions[q_index]
+    st.markdown(f"### ❓ {q_data['q']}")
+    st.caption("Answer as if you are speaking directly to the interviewer.")
+
+    answer = st.text_area(
+        "Your Answer",
+        height=170,
+        placeholder="Write your answer here...",
+        key=f"interview_answer_{selected_job}_{q_index}"
+    )
+
+    if st.button("🤖 Evaluate My Answer", type="primary", use_container_width=True):
+        score, matched, feedback = interview_feedback(answer, q_data)
+        st.session_state.interview_feedback = {
+            "score": score,
+            "matched": matched,
+            "feedback": feedback,
+            "question": q_data["q"],
+            "answer": q_data["answer"],
+            "job": selected_job
+        }
+
+    result = st.session_state.get("interview_feedback")
+    if result and result.get("question") == q_data["q"] and result.get("job") == selected_job:
+        st.divider()
+        score = result["score"]
+        a, b, c = st.columns(3)
+        a.metric("Interview Score", f"{score}%")
+        b.metric("Relevant Points", len(result["matched"]))
+        c.metric("Answer Status", "Strong" if score >= 80 else "Improve")
+        st.progress(score / 100)
+        st.success(result["feedback"])
+
+        if result["matched"]:
+            st.markdown("**✅ Relevant points detected:** " + ", ".join(x.title() for x in result["matched"]))
+
+        with st.expander("💡 Suggested Answer Structure"):
+            st.write(result["answer"])
+
+    st.divider()
+    st.subheader("🚀 Preparation Plan for This Job")
+    plan = [
+        f"Understand the responsibilities of the {selected_job} role.",
+        "Prepare a 60–90 second self-introduction connected to this role.",
+        f"Revise the required skills: {', '.join(required_skills[:8]) or 'role-specific skills'}.",
+        "Prepare one project or internship example that demonstrates your relevant skills.",
+        "Practise explaining your problem-solving approach using Situation, Task, Action and Result.",
+        "Review your skill gaps before the interview and prepare an honest improvement plan."
+    ]
+    for item in plan:
+        st.markdown(f"☐ {item}")
+
+
 # =====================================================
 # MAIN APPLICATION TABS
 # =====================================================
 
-job_tab, course_tab, history_tab = st.tabs([
+job_tab, course_tab, history_tab, interview_tab = st.tabs([
     "💼 Job Recommendation",
     "🎓 Courses & Skill Development",
-    "📜 My History"
+    "📜 My History",
+    "🎤 Interview Preparation"
 ])
 
 with job_tab:
@@ -1895,6 +2249,9 @@ with course_tab:
 
 with history_tab:
     show_history()
+
+with interview_tab:
+    show_interview_preparation()
 
 # =====================================================
 # FOOTER
